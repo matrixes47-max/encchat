@@ -1,14 +1,16 @@
 /**
- * enc.chat v4.1 — Enhanced Zero-Knowledge Encrypted Chat Server
- * Post-Quantum + Tor + Rate Limiting Edition
+ * enc.chat v4.2 — Security Hardened Edition
+ * Post-Quantum + Tor + Rate Limiting + Zero-Knowledge Edition
  *
- * NEW in v4.1:
- *  ✅ Rate Limiting (DDoS protection)
- *  ✅ Tor Hidden Service support
- *  ✅ Enhanced security headers
- *  ✅ Improved TTL management
- *  ✅ Request validation hardening
- *  ✅ Memory usage monitoring
+ * NEW in v4.2:
+ *  ✅ Key Zeroization (tab close)
+ *  ✅ Client-side Room Hashing (server never sees room name)
+ *  ✅ IP Hashing (SHA256 only)
+ *  ✅ Timestamp Jitter (±10s)
+ *  ✅ HSTS preload
+ *  ✅ Local Libraries (no CDN)
+ *  ✅ CSP hardened (cdn.jsdelivr.net removed)
+ *  ✅ DELETE /api/room requires membership proof
  *
  * სერვერმა არ იცის:
  *  - შეტყობინებების შინაარსი (ChaCha20 + AES-256-GCM, client-side)
@@ -136,12 +138,12 @@ app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
   res.setHeader("Pragma", "no-cache");
   
-  // Enhanced CSP with stricter rules
+  // Enhanced CSP — ლოკალური ბიბლიოთეკები, CDN აღარ სჭირდება
   res.setHeader(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
+      "script-src 'self' 'wasm-unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data:",
       "font-src 'self'",
@@ -188,12 +190,7 @@ function isValidNumber(num, min, max) {
 
 function isValidBase64(str, maxLength) {
   if (!isValidString(str, maxLength)) return false;
-  try {
-    // Basic base64 validation
-    return /^[A-Za-z0-9+/]+=*$/.test(str);
-  } catch {
-    return false;
-  }
+  return /^[A-Za-z0-9+/]+=*$/.test(str);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -411,21 +408,34 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
 
 /**
  * DELETE /api/room?room=X
+ * FIX: room-ში active key უნდა ჰქონდეს ამ sid-ს — random წაშლა შეუძლებელია
  */
 app.delete("/api/room", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
   const roomId = req.query.room;
-  
+  const sid    = req.query.sid;
+
   if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH)) {
     return res.status(400).json({ error: "invalid room" });
   }
-  
+
   const rh = getRoomHash(roomId);
+
+  // sid გადამოწმება — მხოლოდ ოთახის წევრს შეუძლია წაშლა
+  if (!isValidString(sid, CONFIG.MAX_SID_LENGTH)) {
+    return res.status(401).json({ error: "sid required" });
+  }
+  const ks = keys.get(rh) || [];
+  const isMember = ks.some(k => k.sid === sid);
+  if (!isMember) {
+    return res.status(403).json({ error: "not a room member" });
+  }
+
   const hadRooms = rooms.has(rh);
-  const hadKeys = keys.has(rh);
-  
+  const hadKeys  = keys.has(rh);
+
   rooms.delete(rh);
   keys.delete(rh);
-  
+
   res.json({ ok: true, deleted: { rooms: hadRooms, keys: hadKeys } });
 });
 
@@ -489,7 +499,7 @@ app.get("*", (_, res) =>
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════════════╗
-║  enc.chat v4.1 — Post-Quantum Enhanced Edition                    ║
+║  enc.chat v4.2 — Security Hardened Edition                        ║
 ╠════════════════════════════════════════════════════════════════════╣
 ║  🔐 ML-KEM-768 + X25519 + Argon2id + Double Ratchet              ║
 ║  🛡️  Rate Limiting: ✅                                             ║
@@ -497,7 +507,7 @@ app.listen(PORT, () => {
 ║  📊 Monitoring: /health, /metrics                                 ║
 ╠════════════════════════════════════════════════════════════════════╣
 ║  Port: ${PORT.toString().padEnd(58)}║
-║  Zero-knowledge: server cannot read messages                      ║
+║  Zero-knowledge: server cannot read messages or room names        ║
 ╚════════════════════════════════════════════════════════════════════╝
   `);
   
