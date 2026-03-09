@@ -312,9 +312,18 @@ async function dhRatchetStep(theirNewPubB64) {
   dr.RK = rk2; dr.CKr = ckr; dr.CKs = cks;
 }
 
+const MAX_SKIP        = 100;  // ერთ ratchet step-ში მაქსიმუმი
+const MAX_MKSKIPPED   = 500;  // სულ cached key-ების ლიმიტი
+
 async function skipMessageKeys(until) {
-  if (until - dr.Nr > 100) throw new Error("Too many skipped");
+  if (until - dr.Nr > MAX_SKIP) throw new Error("Too many skipped");
   while (dr.Nr < until) {
+    // cache ზედმეტად არ გაიზარდოს — ძველ key-ებს ვწმენდთ
+    if (dr.MKSKIPPED.size >= MAX_MKSKIPPED) {
+      const oldest = dr.MKSKIPPED.keys().next().value;
+      zeroBytes(dr.MKSKIPPED.get(oldest));
+      dr.MKSKIPPED.delete(oldest);
+    }
     const [newCKr, mk] = await kdfCK(dr.CKr);
     dr.MKSKIPPED.set(`${dr.DHrB64}:${dr.Nr}`, mk);
     dr.CKr = newCKr; dr.Nr++;
@@ -574,12 +583,35 @@ async function poll() {
   await fetchAndRender();
 }
 
+// ── Secure Key Wipe ───────────────────────────────────────────────
+// null-ის მინიჭება GC-ს ელოდება; ჩვენ ბუფერს ნულებით ვავსებთ პირველ
+function zeroBytes(buf) {
+  if (buf instanceof Uint8Array) buf.fill(0);
+}
+
+function wipeDR() {
+  if (!dr) return;
+  zeroBytes(dr.RK);  zeroBytes(dr.CKs); zeroBytes(dr.CKr);
+  dr.MKSKIPPED.forEach(mk => zeroBytes(mk));
+  dr.MKSKIPPED.clear();
+  dr = null;
+}
+
+function wipeSessionKeys() {
+  zeroBytes(_argon2SK);
+  if (_myMlkemPriv instanceof Uint8Array) zeroBytes(_myMlkemPriv);
+  // X25519 CryptoKey-ები Web Crypto-ს გამო პირდაპირ ვერ ვმუდოებთ,
+  // მაგრამ reference-ს ვაშლით — GC-ს გადავცემთ
+  _myX25519 = null; _myX25519B64 = null;
+  _myMlkemPriv = null; _myMlkemPub = null; _argon2SK = null;
+}
+
 function leaveRoom() {
   clearInterval(pollInterval);
   clearInterval(tickInterval);
-  currentRoom = ""; dr = null; _pendingInit = null;
-  _myX25519 = null; _myX25519B64 = null;
-  _myMlkemPriv = null; _myMlkemPub = null; _argon2SK = null;
+  wipeDR();
+  wipeSessionKeys();
+  currentRoom = ""; _pendingInit = null;
   renderedIds.clear(); sentCache.clear();
   document.getElementById("messages").innerHTML        = "";
   document.getElementById("chat-screen").style.display = "none";
@@ -720,4 +752,18 @@ document.addEventListener("DOMContentLoaded", () => {
   mi.addEventListener("input", function() { autoResize(this); });
   document.getElementById("pass-input").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
   document.getElementById("room-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("pass-input").focus(); });
+});
+
+// tab დახურვა / ჩანართის შეცვლა → გასაღებები დაუყოვნებლივ იწმინდება
+window.addEventListener("beforeunload", () => {
+  wipeDR();
+  wipeSessionKeys();
+});
+
+// tab background-ში გადავიდა → key material-ს ვწმენდთ
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && currentRoom) {
+    wipeDR();
+    wipeSessionKeys();
+  }
 });
