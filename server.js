@@ -22,6 +22,59 @@
 const express = require("express");
 const crypto  = require("crypto");
 const path    = require("path");
+const fs      = require("fs");
+
+
+// ── Library Setup (argon2 + kyber ბრაუზერისთვის) ─────────────────
+function setupLibraries() {
+  const pub = path.join(__dirname, "public");
+
+  // argon2.min.js
+  if (!fs.existsSync(path.join(pub, "argon2.min.js"))) {
+    try {
+      const candidates = [
+        path.join(__dirname, "node_modules/argon2-browser/dist/argon2.min.js"),
+        path.join(__dirname, "node_modules/argon2-browser/dist/argon2.js"),
+      ];
+      for (const f of candidates) {
+        if (fs.existsSync(f)) {
+          fs.copyFileSync(f, path.join(pub, "argon2.min.js"));
+          console.log("✅ argon2.min.js დაკოპირდა");
+          break;
+        }
+      }
+      // wasm ფაილებიც
+      const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
+      if (fs.existsSync(wasmDir)) {
+        for (const f of fs.readdirSync(wasmDir)) {
+          if (f.endsWith(".wasm")) {
+            fs.copyFileSync(path.join(wasmDir, f), path.join(pub, f));
+          }
+        }
+      }
+    } catch(e) { console.error("❌ argon2 setup:", e.message); }
+  }
+
+  // kyber.min.js
+  if (!fs.existsSync(path.join(pub, "kyber.min.js"))) {
+    try {
+      const kyberPkg = path.join(__dirname, "node_modules/crystals-kyber-js");
+      const pkgJson = JSON.parse(fs.readFileSync(path.join(kyberPkg, "package.json"), "utf8"));
+      const mainFile = path.join(kyberPkg, pkgJson.main || "index.js");
+      const src = fs.readFileSync(mainFile, "utf8");
+      // CommonJS → browser global wrapper
+      const wrapped = `(function(global){
+var module={exports:{}};var exports=module.exports;
+${src}
+var lib=module.exports;
+global.Kyber768=lib.Kyber768||lib.default?.Kyber768||lib;
+})(typeof window!=="undefined"?window:this);`;
+      fs.writeFileSync(path.join(pub, "kyber.min.js"), wrapped);
+      console.log("✅ kyber.min.js შეიქმნა");
+    } catch(e) { console.error("❌ kyber setup:", e.message); }
+  }
+}
+setupLibraries();
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
