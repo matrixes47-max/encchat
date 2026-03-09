@@ -13,15 +13,10 @@ COPY server.js ./
 COPY public ./public/
 
 # ბიბლიოთეკები CDN-ის გარეშე — ლოკალურად
-# kyber JS — node-ით პირდაპირ bundle
-RUN node -e "\
-const k=require('crystals-kyber-js');\
-const fs=require('fs');\
-const src=fs.readFileSync(require.resolve('crystals-kyber-js'),{encoding:'utf8'});\
-const wrap='(function(global){'+src+'\nglobal.Kyber768=module.exports.Kyber768;global.Kyber512=module.exports.Kyber512;global.Kyber1024=module.exports.Kyber1024;})(globalThis);';\
-fs.writeFileSync('public/kyber.min.js',wrap);\
-" 2>/dev/null || \
-    find node_modules/crystals-kyber-js -name "*.js" ! -name "*.test.js" | head -1 | xargs -I{} cp {} public/kyber.min.js
+# kyber JS — browserify-ით bundle
+RUN npm install -g browserify --silent && \
+    echo "var k=require('crystals-kyber-js');window.Kyber768=k.Kyber768;window.Kyber512=k.Kyber512;window.Kyber1024=k.Kyber1024;" > /tmp/kyber-entry.js && \
+    browserify /tmp/kyber-entry.js -o public/kyber.min.js
 
 # argon2 JS + WASM (FIX: .wasm ფაილები სავალდებულოა runtime-ზე)
 RUN cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
