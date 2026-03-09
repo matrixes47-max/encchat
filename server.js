@@ -29,7 +29,7 @@ app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'"
+    "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; connect-src 'self'"
   );
   next();
 });
@@ -81,7 +81,7 @@ app.post("/api/keys", (req, res) => {
     return res.status(400).json({ error: "invalid room" });
   if (!sid  || typeof sid  !== "string" || sid.length  > 64)
     return res.status(400).json({ error: "invalid sid" });
-  if (!pub  || typeof pub  !== "string" || pub.length  > 200)
+  if (!pub  || typeof pub  !== "string" || pub.length  > 100)
     return res.status(400).json({ error: "invalid pub" });
 
   const roomHash = hashRoom(room);
@@ -193,13 +193,13 @@ app.delete("/api/room", (req, res) => {
 });
 
 // ── Health ────────────────────────────────────────────────────────
-app.get("/health", (_, res) => res.json({ status: "ok", version: "2.0-dr" }));
+app.get("/health", (_, res) => res.json({ status: "ok", version: "3.0-max" }));
 
 app.get("*", (_, res) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
 
 app.listen(PORT, () => {
-  console.log(`enc.chat v2 (Double Ratchet) on port ${PORT}`);
+  console.log(`enc.chat v3 (Argon2id + X25519 + Padding + Fingerprint) on port ${PORT}`);
   console.log("Zero-knowledge: server cannot read messages.");
 });
