@@ -13,10 +13,10 @@ COPY server.js ./
 COPY public ./public/
 
 # ბიბლიოთეკები CDN-ის გარეშე — ლოკალურად
-# kyber JS — browserify-ით bundle
-RUN npm install -g browserify --silent && \
+# kyber JS — browserify ლოკალურად
+RUN npm install browserify --no-save && \
     echo "var k=require('crystals-kyber-js');window.Kyber768=k.Kyber768;window.Kyber512=k.Kyber512;window.Kyber1024=k.Kyber1024;" > /tmp/kyber-entry.js && \
-    browserify /tmp/kyber-entry.js -o public/kyber.min.js
+    ./node_modules/.bin/browserify /tmp/kyber-entry.js -o public/kyber.min.js
 
 # argon2 JS + WASM (FIX: .wasm ფაილები სავალდებულოა runtime-ზე)
 RUN cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
