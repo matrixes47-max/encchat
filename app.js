@@ -66,9 +66,19 @@ function generateCodes() {
   document.getElementById("gen-pass").textContent = pass;
   document.getElementById("gen-result").style.display = "block";
 
-  // ავტომატურად შეიყვანე ველებში
   document.getElementById("room-input").value = room;
   document.getElementById("pass-input").value = pass;
+
+  document.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.onclick = () => {
+      const val = document.getElementById(btn.dataset.target).textContent;
+      navigator.clipboard.writeText(val).then(() => {
+        btn.textContent = "✓";
+        btn.classList.add("copied");
+        setTimeout(() => { btn.textContent = "კოპირება"; btn.classList.remove("copied"); }, 1500);
+      });
+    };
+  });
 }
 
 // ══════════════════════════════════════════════════════
@@ -249,19 +259,7 @@ function formatTime(secs) {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("gen-btn").addEventListener("click", generateCodes);
-
-  document.querySelectorAll(".copy-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const val = document.getElementById(btn.dataset.target).textContent;
-      navigator.clipboard.writeText(val).then(() => {
-        btn.textContent = "✓";
-        btn.classList.add("copied");
-        setTimeout(() => { btn.textContent = "კოპირება"; btn.classList.remove("copied"); }, 1500);
-      });
-    });
-  });
-
-  document.getElementById("join-screen").querySelector("button:not(#gen-btn):not(.copy-btn)").addEventListener("click", joinRoom);
+  document.getElementById("join-btn").addEventListener("click", joinRoom);
   document.getElementById("leave-btn").addEventListener("click", leaveRoom);
   document.getElementById("send-btn").addEventListener("click", sendMessage);
 
