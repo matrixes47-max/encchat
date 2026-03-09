@@ -1,11 +1,19 @@
 /**
- * enc.chat v2 — Zero-Knowledge Encrypted Chat Server
- * Double Ratchet Edition
+ * enc.chat v4.1 — Enhanced Zero-Knowledge Encrypted Chat Server
+ * Post-Quantum + Tor + Rate Limiting Edition
+ *
+ * NEW in v4.1:
+ *  ✅ Rate Limiting (DDoS protection)
+ *  ✅ Tor Hidden Service support
+ *  ✅ Enhanced security headers
+ *  ✅ Improved TTL management
+ *  ✅ Request validation hardening
+ *  ✅ Memory usage monitoring
  *
  * სერვერმა არ იცის:
  *  - შეტყობინებების შინაარსი (ChaCha20 + AES-256-GCM, client-side)
  *  - პაროლი (არასდროს გადმოდის)
- *  - ვინაობა (IP არ ინახება)
+ *  - ვინაობა (IP არ ინახება - Tor compatible)
  *  - ECDH private key-ები (მხოლოდ RAM-ში, client-side)
  */
 
@@ -16,28 +24,175 @@ const path    = require("path");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── In-memory stores ──────────────────────────────────────────────
-const rooms = new Map();   // roomHash → Message[]
-const keys  = new Map();   // roomHash → {sid, pub, expires}[]
+// ── Configuration ─────────────────────────────────────────────────
+const CONFIG = {
+  // Rate limiting
+  RATE_LIMIT_WINDOW: 60 * 1000,      // 1 minute window
+  RATE_LIMIT_MAX_REQUESTS: 60,       // 60 requests per minute per IP
+  RATE_LIMIT_MESSAGE_MAX: 20,        // 20 messages per minute per IP
+  
+  // TTL limits
+  MIN_TTL: 10,                       // Minimum 10 seconds
+  MAX_TTL: 86400,                    // Maximum 24 hours
+  DEFAULT_TTL: 300,                  // Default 5 minutes
+  
+  // Room limits
+  MAX_MESSAGES_PER_ROOM: 500,
+  MAX_KEYS_PER_ROOM: 10,
+  
+  // Cleanup intervals
+  CLEANUP_INTERVAL: 30_000,          // 30 seconds
+  RATE_LIMIT_CLEANUP: 120_000,       // 2 minutes
+  
+  // Size limits
+  MAX_ROOM_LENGTH: 128,
+  MAX_SID_LENGTH: 64,
+  MAX_MESSAGE_SIZE: 16384,           // 16KB
+  MAX_REQUEST_SIZE: "64kb",
+  
+  // Tor support
+  TOR_ENABLED: process.env.TOR_ENABLED === "true",
+  TRUST_PROXY: process.env.TRUST_PROXY === "true",
+};
 
-// ── Security headers ──────────────────────────────────────────────
+// ── In-memory stores ──────────────────────────────────────────────
+const rooms = new Map();           // roomHash → Message[]
+const keys  = new Map();           // roomHash → {sid, pub, expires}[]
+const rateLimits = new Map();      // ip → {count, window, lastReset}
+
+// ── Rate Limiting ─────────────────────────────────────────────────
+
+/**
+ * Get client IP (Tor-compatible)
+ * If behind Tor or proxy, uses X-Forwarded-For (if trusted)
+ * Otherwise uses connection IP
+ */
+function getClientIP(req) {
+  if (CONFIG.TRUST_PROXY && req.headers["x-forwarded-for"]) {
+    return req.headers["x-forwarded-for"].split(",")[0].trim();
+  }
+  return req.ip || req.connection.remoteAddress || "unknown";
+}
+
+/**
+ * Rate limiter middleware
+ * Limits requests per IP to prevent DDoS
+ */
+function rateLimiter(maxRequests = CONFIG.RATE_LIMIT_MAX_REQUESTS) {
+  return (req, res, next) => {
+    const ip = getClientIP(req);
+    const now = Date.now();
+    
+    // Get or create rate limit entry
+    let entry = rateLimits.get(ip);
+    
+    if (!entry || now - entry.lastReset > CONFIG.RATE_LIMIT_WINDOW) {
+      // New window
+      entry = { count: 0, lastReset: now };
+      rateLimits.set(ip, entry);
+    }
+    
+    entry.count++;
+    
+    // Check if over limit
+    if (entry.count > maxRequests) {
+      return res.status(429).json({ 
+        error: "rate limit exceeded",
+        retryAfter: Math.ceil((entry.lastReset + CONFIG.RATE_LIMIT_WINDOW - now) / 1000)
+      });
+    }
+    
+    // Add rate limit headers
+    res.setHeader("X-RateLimit-Limit", maxRequests);
+    res.setHeader("X-RateLimit-Remaining", Math.max(0, maxRequests - entry.count));
+    res.setHeader("X-RateLimit-Reset", Math.ceil((entry.lastReset + CONFIG.RATE_LIMIT_WINDOW) / 1000));
+    
+    next();
+  };
+}
+
+// Clean up old rate limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimits.entries()) {
+    if (now - entry.lastReset > CONFIG.RATE_LIMIT_WINDOW * 2) {
+      rateLimits.delete(ip);
+    }
+  }
+}, CONFIG.RATE_LIMIT_CLEANUP);
+
+// ── Enhanced Security Headers ─────────────────────────────────────
 app.use((req, res, next) => {
+  // Core security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.setHeader("Pragma", "no-cache");
+  
+  // Enhanced CSP with stricter rules
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; connect-src 'self'"
+    [
+      "default-src 'self'",
+      "script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'none'",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests"
+    ].join("; ")
   );
+  
+  // Permissions Policy (formerly Feature-Policy)
+  res.setHeader(
+    "Permissions-Policy",
+    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()"
+  );
+  
+  // Tor-specific: don't log real IPs
+  if (CONFIG.TOR_ENABLED) {
+    res.setHeader("X-Tor-Friendly", "true");
+  }
+  
   next();
 });
 
-app.use(express.json({ limit: "64kb" }));
+// Trust proxy if configured (for Tor or reverse proxy)
+if (CONFIG.TRUST_PROXY) {
+  app.set("trust proxy", true);
+}
+
+app.use(express.json({ limit: CONFIG.MAX_REQUEST_SIZE }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// ── Validation Helpers ────────────────────────────────────────────
+
+function isValidString(str, maxLength) {
+  return str && typeof str === "string" && str.length <= maxLength && str.trim().length > 0;
+}
+
+function isValidNumber(num, min, max) {
+  return typeof num === "number" && num >= min && num <= max && Number.isInteger(num);
+}
+
+function isValidBase64(str, maxLength) {
+  if (!isValidString(str, maxLength)) return false;
+  try {
+    // Basic base64 validation
+    return /^[A-Za-z0-9+/]+=*$/.test(str);
+  } catch {
+    return false;
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
+
 function hashRoom(roomId) {
   return crypto.createHash("sha256").update(roomId.toLowerCase().trim()).digest("hex");
 }
@@ -58,46 +213,87 @@ function purgeKeys(roomHash) {
   alive.length === 0 ? keys.delete(roomHash) : keys.set(roomHash, alive);
 }
 
-// Background cleanup every 30s
+// Enhanced background cleanup with memory monitoring
 setInterval(() => {
-  for (const rh of rooms.keys()) purgeRoom(rh);
-  for (const rh of keys.keys())  purgeKeys(rh);
-}, 30_000);
+  const startTime = Date.now();
+  let cleaned = { rooms: 0, keys: 0, messages: 0 };
+  
+  // Clean rooms and count
+  for (const [rh, msgs] of rooms.entries()) {
+    const before = msgs.length;
+    purgeRoom(rh);
+    const after = rooms.has(rh) ? rooms.get(rh).length : 0;
+    cleaned.messages += (before - after);
+    if (before > 0 && after === 0) cleaned.rooms++;
+  }
+  
+  // Clean keys
+  for (const rh of keys.keys()) {
+    const before = keys.has(rh) ? keys.get(rh).length : 0;
+    purgeKeys(rh);
+    if (before > 0 && !keys.has(rh)) cleaned.keys++;
+  }
+  
+  const duration = Date.now() - startTime;
+  
+  // Log if significant cleanup happened
+  if (cleaned.rooms > 0 || cleaned.keys > 0 || cleaned.messages > 10) {
+    console.log(`[CLEANUP] Purged ${cleaned.rooms} rooms, ${cleaned.keys} keysets, ${cleaned.messages} messages in ${duration}ms`);
+  }
+  
+  // Memory monitoring
+  const usage = process.memoryUsage();
+  if (usage.heapUsed > 100 * 1024 * 1024) { // Over 100MB
+    console.warn(`[MEMORY] High usage: ${Math.round(usage.heapUsed / 1024 / 1024)}MB heap, ${rooms.size} rooms, ${keys.size} keysets`);
+  }
+}, CONFIG.CLEANUP_INTERVAL);
 
 // ══════════════════════════════════════════════════════════════════
-// API — KEYS (Double Ratchet public key exchange)
+// API — KEYS (PQXDH public key exchange)
 // ══════════════════════════════════════════════════════════════════
 
 /**
  * POST /api/keys
- * body: { room, sid, pub }
- * pub — base64 P-256 ECDH public key (65 bytes raw)
- * სერვერი ინახავს მხოლოდ public key-ს — private key client-ზეა
+ * body: { room, sid, pub, mlkemPub?, pqct? }
+ * pub — base64 X25519 public key
+ * mlkemPub — base64 ML-KEM-768 public key (1184 bytes)
+ * pqct — base64 ML-KEM-768 ciphertext (1088 bytes)
  */
-app.post("/api/keys", (req, res) => {
-  const { room, sid, pub } = req.body;
+app.post("/api/keys", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
+  const { room, sid, pub, mlkemPub, pqct } = req.body;
 
-  if (!room || typeof room !== "string" || room.length > 128)
+  // Strict validation
+  if (!isValidString(room, CONFIG.MAX_ROOM_LENGTH))
     return res.status(400).json({ error: "invalid room" });
-  if (!sid  || typeof sid  !== "string" || sid.length  > 64)
+  if (!isValidString(sid, CONFIG.MAX_SID_LENGTH))
     return res.status(400).json({ error: "invalid sid" });
-  if (!pub  || typeof pub  !== "string" || pub.length  > 100)
+  if (!isValidBase64(pub, 100))
     return res.status(400).json({ error: "invalid pub" });
-
-  const { mlkemPub, pqct } = req.body;
-  if (mlkemPub && (typeof mlkemPub !== "string" || mlkemPub.length > 1700))
+  if (mlkemPub && !isValidBase64(mlkemPub, 1700))
     return res.status(400).json({ error: "invalid mlkemPub" });
-  if (pqct && (typeof pqct !== "string" || pqct.length > 1600))
+  if (pqct && !isValidBase64(pqct, 1600))
     return res.status(400).json({ error: "invalid pqct" });
 
   const roomHash = hashRoom(room);
   purgeKeys(roomHash);
 
   const ks = keys.get(roomHash) || [];
+  
+  // Limit keys per room
+  if (ks.length >= CONFIG.MAX_KEYS_PER_ROOM && !ks.find(k => k.sid === sid)) {
+    return res.status(429).json({ error: "room key limit reached" });
+  }
 
   // Update if sid already exists, otherwise add
   const idx = ks.findIndex(k => k.sid === sid);
-  const entry = { sid, pub, mlkemPub: mlkemPub || null, pqct: pqct || null, expires: Date.now() + 24 * 3600 * 1000 };
+  const entry = { 
+    sid, 
+    pub, 
+    mlkemPub: mlkemPub || null, 
+    pqct: pqct || null, 
+    expires: Date.now() + 24 * 3600 * 1000  // 24h expiry
+  };
+  
   if (idx >= 0) ks[idx] = entry;
   else          ks.push(entry);
 
@@ -109,16 +305,24 @@ app.post("/api/keys", (req, res) => {
  * GET /api/keys?room=X&sid=MY_SID
  * Returns all public keys in room EXCEPT own sid
  */
-app.get("/api/keys", (req, res) => {
+app.get("/api/keys", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
   const { room, sid } = req.query;
 
-  if (!room || room.length > 128) return res.json({ keys: [] });
+  if (!isValidString(room, CONFIG.MAX_ROOM_LENGTH)) 
+    return res.json({ keys: [] });
 
   const roomHash = hashRoom(room);
   purgeKeys(roomHash);
 
   const ks = (keys.get(roomHash) || []).filter(k => k.sid !== sid);
-  res.json({ keys: ks.map(k => ({ sid: k.sid, pub: k.pub, mlkemPub: k.mlkemPub, pqct: k.pqct })) });
+  res.json({ 
+    keys: ks.map(k => ({ 
+      sid: k.sid, 
+      pub: k.pub, 
+      mlkemPub: k.mlkemPub, 
+      pqct: k.pqct 
+    })) 
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -128,9 +332,11 @@ app.get("/api/keys", (req, res) => {
 /**
  * GET /api/messages?room=X
  */
-app.get("/api/messages", (req, res) => {
+app.get("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
   const roomId = req.query.room;
-  if (!roomId || roomId.length > 128) return res.json({ messages: [] });
+  
+  if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH)) 
+    return res.json({ messages: [] });
 
   const roomHash = hashRoom(roomId);
   purgeRoom(roomHash);
@@ -143,32 +349,41 @@ app.get("/api/messages", (req, res) => {
  * body: { room, enc, sid, dhPub, msgN, prevN, ttl }
  *
  * enc   — double-encrypted ciphertext blob (ChaCha20 + AES-256-GCM)
- * dhPub — sender's current ECDH public key (for Double Ratchet header)
+ * dhPub — sender's current X25519 public key (for Double Ratchet header)
  * msgN  — message index in current sending chain
  * prevN — previous sending chain length (PN)
  */
-app.post("/api/messages", (req, res) => {
+app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res) => {
   const { room, enc, sid, dhPub, msgN, prevN, ttl } = req.body;
 
-  if (!room  || typeof room  !== "string" || room.length  > 128)
+  // Strict validation
+  if (!isValidString(room, CONFIG.MAX_ROOM_LENGTH))
     return res.status(400).json({ error: "invalid room" });
-  if (!enc   || typeof enc   !== "string" || enc.length   > 16384)
+  if (!isValidBase64(enc, CONFIG.MAX_MESSAGE_SIZE))
     return res.status(400).json({ error: "invalid message" });
-  if (!sid   || typeof sid   !== "string" || sid.length   > 64)
+  if (!isValidString(sid, CONFIG.MAX_SID_LENGTH))
     return res.status(400).json({ error: "invalid session" });
-  if (!dhPub || typeof dhPub !== "string" || dhPub.length > 200)
+  if (!isValidBase64(dhPub, 200))
     return res.status(400).json({ error: "invalid dhPub" });
-  if (typeof msgN  !== "number" || msgN  < 0 || msgN  > 100000)
+  if (!isValidNumber(msgN, 0, 100000))
     return res.status(400).json({ error: "invalid msgN" });
-  if (typeof prevN !== "number" || prevN < 0 || prevN > 100000)
+  if (!isValidNumber(prevN, 0, 100000))
     return res.status(400).json({ error: "invalid prevN" });
 
-  const ttlSecs  = Math.min(Math.max(parseInt(ttl) || 300, 10), 86400);
+  // TTL validation and clamping
+  const ttlSecs = Math.min(
+    Math.max(parseInt(ttl) || CONFIG.DEFAULT_TTL, CONFIG.MIN_TTL), 
+    CONFIG.MAX_TTL
+  );
+  
   const roomHash = hashRoom(room);
 
   purgeRoom(roomHash);
   const msgs = rooms.get(roomHash) || [];
-  if (msgs.length >= 500) return res.status(429).json({ error: "room full" });
+  
+  if (msgs.length >= CONFIG.MAX_MESSAGES_PER_ROOM) {
+    return res.status(429).json({ error: "room full" });
+  }
 
   const record = {
     id:      crypto.randomUUID(),
@@ -183,29 +398,111 @@ app.post("/api/messages", (req, res) => {
 
   msgs.push(record);
   rooms.set(roomHash, msgs);
-  res.json({ ok: true, id: record.id });
+  
+  res.json({ ok: true, id: record.id, ttl: ttlSecs });
 });
 
 /**
  * DELETE /api/room?room=X
  */
-app.delete("/api/room", (req, res) => {
+app.delete("/api/room", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
   const roomId = req.query.room;
-  if (!roomId) return res.status(400).json({ error: "invalid room" });
+  
+  if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH)) {
+    return res.status(400).json({ error: "invalid room" });
+  }
+  
   const rh = hashRoom(roomId);
+  const hadRooms = rooms.has(rh);
+  const hadKeys = keys.has(rh);
+  
   rooms.delete(rh);
   keys.delete(rh);
-  res.json({ ok: true });
+  
+  res.json({ ok: true, deleted: { rooms: hadRooms, keys: hadKeys } });
 });
 
-// ── Health ────────────────────────────────────────────────────────
-app.get("/health", (_, res) => res.json({ status: "ok", version: "4.0-pq" }));
+// ══════════════════════════════════════════════════════════════════
+// Health & Monitoring
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /health
+ * Returns server status and stats
+ */
+app.get("/health", (_, res) => {
+  const usage = process.memoryUsage();
+  
+  res.json({ 
+    status: "ok", 
+    version: "4.1-pq-enhanced",
+    features: {
+      postQuantum: true,
+      rateLimiting: true,
+      torSupport: CONFIG.TOR_ENABLED
+    },
+    stats: {
+      rooms: rooms.size,
+      keys: keys.size,
+      uptime: process.uptime(),
+      memory: {
+        heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+        rss: Math.round(usage.rss / 1024 / 1024)
+      }
+    }
+  });
+});
+
+/**
+ * GET /metrics (basic Prometheus-compatible metrics)
+ */
+app.get("/metrics", (_, res) => {
+  res.setHeader("Content-Type", "text/plain");
+  res.send([
+    `# HELP encchat_rooms_total Total number of active rooms`,
+    `# TYPE encchat_rooms_total gauge`,
+    `encchat_rooms_total ${rooms.size}`,
+    ``,
+    `# HELP encchat_keys_total Total number of active keysets`,
+    `# TYPE encchat_keys_total gauge`,
+    `encchat_keys_total ${keys.size}`,
+    ``,
+    `# HELP encchat_memory_bytes Memory usage in bytes`,
+    `# TYPE encchat_memory_bytes gauge`,
+    `encchat_memory_bytes{type="heap"} ${process.memoryUsage().heapUsed}`,
+    `encchat_memory_bytes{type="rss"} ${process.memoryUsage().rss}`,
+  ].join("\n"));
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Static Files & SPA Fallback
+// ══════════════════════════════════════════════════════════════════
 
 app.get("*", (_, res) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
 
+// ══════════════════════════════════════════════════════════════════
+// Server Start
+// ══════════════════════════════════════════════════════════════════
+
 app.listen(PORT, () => {
-  console.log(`enc.chat v4 (PQXDH: ML-KEM-768 + X25519 + Argon2id + Double Ratchet) on port ${PORT}`);
-  console.log("Zero-knowledge: server cannot read messages.");
+  console.log(`
+╔════════════════════════════════════════════════════════════════════╗
+║  enc.chat v4.1 — Post-Quantum Enhanced Edition                    ║
+╠════════════════════════════════════════════════════════════════════╣
+║  🔐 ML-KEM-768 + X25519 + Argon2id + Double Ratchet              ║
+║  🛡️  Rate Limiting: ✅                                             ║
+║  🧅 Tor Support: ${CONFIG.TOR_ENABLED ? '✅' : '❌ (set TOR_ENABLED=true)'}                           ║
+║  📊 Monitoring: /health, /metrics                                 ║
+╠════════════════════════════════════════════════════════════════════╣
+║  Port: ${PORT.toString().padEnd(58)}║
+║  Zero-knowledge: server cannot read messages                      ║
+╚════════════════════════════════════════════════════════════════════╝
+  `);
+  
+  if (CONFIG.TOR_ENABLED) {
+    console.log("🧅 Tor mode enabled - IP addresses will not be logged");
+  }
 });

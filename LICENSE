@@ -1,0 +1,50 @@
+MIT License
+
+Copyright (c) 2025 enc.chat
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+THIRD-PARTY LICENSES
+
+This software uses the following open-source components:
+
+1. Express.js - MIT License
+   Copyright (c) 2009-2014 TJ Holowaychuk <tj@vision-media.ca>
+   Copyright (c) 2013-2014 Roman Shtylman <shtylman+expressjs@gmail.com>
+   Copyright (c) 2014-2015 Douglas Christopher Wilson <doug@somethingdoug.com>
+
+2. Node.js - MIT License
+   Copyright Node.js contributors. All rights reserved.
+
+3. ML-KEM (Kyber) - Public Domain (NIST Reference Implementation)
+   Disclaimer: Implementations based on NIST FIPS 203 specification
+
+4. ChaCha20 - Public Domain (Daniel J. Bernstein)
+   https://cr.yp.to/chacha.html
+
+Note: Frontend cryptography implementations are based on public specifications:
+- X25519 (RFC 7748)
+- Argon2id (RFC 9106)
+- HKDF (RFC 5869)
+- ChaCha20 (RFC 7539)
+
+All cryptographic implementations are used in accordance with their respective
+licenses and specifications.

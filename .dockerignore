@@ -1,0 +1,55 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CHANGELOG.md
+SECURITY.md
+LICENSE
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.production
+.env.example
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deployment configs (keep only what's needed)
+docker-compose.yml
+.dockerignore
+
+# Testing
+coverage/
+test/
+*.test.js
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary
+tmp/
+temp/
