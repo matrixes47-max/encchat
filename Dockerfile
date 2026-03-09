@@ -13,11 +13,16 @@ COPY server.js ./
 COPY public ./public/
 
 # ბიბლიოთეკები CDN-ის გარეშე — ლოკალურად
+# kyber JS
 RUN cp node_modules/crystals-kyber-js/kyber.min.js public/kyber.min.js 2>/dev/null || \
     cp $(find node_modules/crystals-kyber-js -name "*.min.js" | head -1) public/kyber.min.js 2>/dev/null || \
-    cp $(find node_modules/crystals-kyber-js -name "*.js" | grep -v node | head -1) public/kyber.min.js && \
-    cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
-    cp $(find node_modules/argon2-browser -name "*.min.js" | head -1) public/argon2.min.js
+    cp $(find node_modules/crystals-kyber-js -name "*.js" | grep -v node | head -1) public/kyber.min.js
+
+# argon2 JS + WASM (FIX: .wasm ფაილები სავალდებულოა runtime-ზე)
+RUN cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
+    cp $(find node_modules/argon2-browser -name "*.min.js" | head -1) public/argon2.min.js && \
+    find node_modules/argon2-browser -name "*.wasm" -exec cp {} public/ \; && \
+    find node_modules/argon2-browser -name "argon2-simd.wasm" -exec cp {} public/ \; || true
 
 RUN addgroup -g 1001 -S encchat && \
     adduser -S encchat -u 1001 && \
