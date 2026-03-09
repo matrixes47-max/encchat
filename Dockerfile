@@ -14,9 +14,9 @@ COPY public ./public/
 
 # ბიბლიოთეკები CDN-ის გარეშე — ლოკალურად
 # kyber JS
-RUN cp node_modules/crystals-kyber-js/kyber.min.js public/kyber.min.js 2>/dev/null || \
-    cp $(find node_modules/crystals-kyber-js -name "*.min.js" | head -1) public/kyber.min.js 2>/dev/null || \
-    cp $(find node_modules/crystals-kyber-js -name "*.js" | grep -v node | head -1) public/kyber.min.js
+RUN npm install -g esbuild --silent && \
+    echo "const k=require('crystals-kyber-js');globalThis.Kyber768=k.Kyber768;globalThis.Kyber512=k.Kyber512;globalThis.Kyber1024=k.Kyber1024;" > /tmp/ke.js && \
+    esbuild /tmp/ke.js --bundle --outfile=public/kyber.min.js --platform=browser --minify
 
 # argon2 JS + WASM (FIX: .wasm ფაილები სავალდებულოა runtime-ზე)
 RUN cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
