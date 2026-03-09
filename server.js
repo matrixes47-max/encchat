@@ -39,6 +39,7 @@ const CONFIG = {
   DEFAULT_TTL: 300,                  // Default 5 minutes
   
   // Room limits
+  MAX_ROOMS: 1000,               // Max concurrent rooms (DoS protection)
   MAX_MESSAGES_PER_ROOM: 500,
   MAX_KEYS_PER_ROOM: 10,
   
@@ -383,7 +384,12 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
 
   purgeRoom(roomHash);
   const msgs = rooms.get(roomHash) || [];
-  
+
+  // FIX: ახალი ოთახების შეზღუდვა — memory exhaustion DoS-ის წინააღმდეგ
+  if (!rooms.has(roomHash) && rooms.size >= CONFIG.MAX_ROOMS) {
+    return res.status(503).json({ error: "server at capacity" });
+  }
+
   if (msgs.length >= CONFIG.MAX_MESSAGES_PER_ROOM) {
     return res.status(429).json({ error: "room full" });
   }
