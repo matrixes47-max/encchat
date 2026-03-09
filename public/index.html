@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ka">
-<head> 
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>enc.chat</title>
@@ -101,11 +101,21 @@
   }
 
   #join-info {
-    color: #888;
-    font-size: 12px;
     margin-top: 36px;
-    line-height: 2.2;
-    letter-spacing: 0.5px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #join-info span {
+    display: block;
+    color: #aaa;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.4px;
+    padding: 8px 12px;
+    border-left: 2px solid #cc0000;
+    background: rgba(204, 0, 0, 0.05);
   }
 
   /* ── CHAT ── */
@@ -502,13 +512,13 @@
   <div id="join-status" style="display:none; color:#888; font-size:11px; margin-top:10px; letter-spacing:1px;"></div>
 
   <div id="join-info">
-    — ML-KEM-768: კვანტური კომპიუტერი ვერ გატეხს<br>
-    — X25519 + PQXDH + Argon2id + Double Ratchet<br>
-    — ChaCha20 + AES-256-GCM + Message Padding (8 ფენა)<br>
-    — პაროლი და ოთახის სახელი სერვერს არ ეხება<br>
-    — IP არ ინახება · Timestamp jitter · Zero-Knowledge<br>
-    — Tab დახურვისას გასაღებები დაუყოვნებლივ იშლება<br>
-    — შეტყობინება თვითგანადგურდება
+    <span>— ML-KEM-768: კვანტური კომპიუტერი ვერ გატეხს</span>
+    <span>— X25519 + PQXDH + Argon2id + Double Ratchet</span>
+    <span>— ChaCha20 + AES-256-GCM + Message Padding (8 ფენა)</span>
+    <span>— პაროლი და ოთახის სახელი სერვერს არ ეხება</span>
+    <span>— IP არ ინახება · Timestamp jitter · Zero-Knowledge</span>
+    <span>— Tab დახურვისას გასაღებები დაუყოვნებლივ იშლება</span>
+    <span>— შეტყობინება თვითგანადგურდება</span>
   </div>
 </div>
 
