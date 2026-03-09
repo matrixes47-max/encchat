@@ -383,7 +383,11 @@ async function ratchetDecrypt(encB64, header) {
     const afterAes    = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
     const plain       = chacha20Xor(chachaKey, chachaNonce, new Uint8Array(afterAes));
     return new TextDecoder().decode(unpadMessage(plain));
-  } catch { return null; }
+  } catch (e) {
+    // FIX: შეცდომა ჩანს console-ში — silent fail-ის მაგივრად
+    console.warn("[ratchetDecrypt] failed:", e?.message || e);
+    return null;
+  }
 }
 
 
@@ -527,6 +531,10 @@ async function joinRoom() {
   const pass = document.getElementById("pass-input").value;
   if (!room || !pass)          { showError("ოთახის კოდი და პაროლი საჭიროა."); return; }
   if (room.length > 128 || pass.length > 256) { showError("ძალიან გრძელი."); return; }
+
+  // FIX: წინა intervals-ების გასუფთავება — error path-ზე leak-ის წინააღმდეგ
+  clearInterval(pollInterval);
+  clearInterval(tickInterval);
 
   document.getElementById("join-btn").disabled    = true;
   document.getElementById("join-btn").textContent = "[ იტვირთება... ]";
@@ -711,7 +719,12 @@ async function renderMessages(records) {
   const serverIds = new Set(records.map(r => r.id));
 
   document.querySelectorAll(".msg[data-id]").forEach(el => {
-    if (!serverIds.has(el.dataset.id)) { el.remove(); renderedIds.delete(el.dataset.id); }
+    if (!serverIds.has(el.dataset.id)) {
+      // FIX: DOM-თან ერთად sentCache-იდანაც ვშლით — memory leak-ის წინააღმდეგ
+      sentCache.delete(el.dataset.id);
+      renderedIds.delete(el.dataset.id);
+      el.remove();
+    }
   });
 
   let scrollNeeded = false;
