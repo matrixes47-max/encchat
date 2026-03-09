@@ -68,10 +68,14 @@ const rateLimits = new Map();      // ip → {count, window, lastReset}
  * Otherwise uses connection IP
  */
 function getClientIP(req) {
+  let raw;
   if (CONFIG.TRUST_PROXY && req.headers["x-forwarded-for"]) {
-    return req.headers["x-forwarded-for"].split(",")[0].trim();
+    raw = req.headers["x-forwarded-for"].split(",")[0].trim();
+  } else {
+    raw = req.ip || req.connection.remoteAddress || "unknown";
   }
-  return req.ip || req.connection.remoteAddress || "unknown";
+  // IP-ს არასოდეს ვინახავთ raw სახით — მხოლოდ ერთჯერადი hash
+  return crypto.createHash("sha256").update(raw + "enc.chat-ratelimit-salt").digest("hex").slice(0, 16);
 }
 
 /**
@@ -389,10 +393,11 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
     id:      crypto.randomUUID(),
     enc,
     sid,
-    dhPub,           // Double Ratchet header — sender's current DH public key
-    msgN,            // message counter in chain
-    prevN,           // previous chain length
-    ts:      Date.now(),
+    dhPub,
+    msgN,
+    prevN,
+    // ±10 წამის jitter — timing correlation attack-ის წინააღმდეგ
+    ts:      Date.now() + Math.floor((Math.random() - 0.5) * 20_000),
     expires: Date.now() + ttlSecs * 1000
   };
 
@@ -431,8 +436,6 @@ app.delete("/api/room", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) 
  * Returns server status and stats
  */
 app.get("/health", (_, res) => {
-  const usage = process.memoryUsage();
-  
   res.json({ 
     status: "ok", 
     version: "4.1-pq-enhanced",
@@ -440,24 +443,18 @@ app.get("/health", (_, res) => {
       postQuantum: true,
       rateLimiting: true,
       torSupport: CONFIG.TOR_ENABLED
-    },
-    stats: {
-      rooms: rooms.size,
-      keys: keys.size,
-      uptime: process.uptime(),
-      memory: {
-        heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
-        heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
-        rss: Math.round(usage.rss / 1024 / 1024)
-      }
     }
+    // rooms/keys/memory count არ ვაჩვენებთ — metadata leak
   });
 });
 
-/**
- * GET /metrics (basic Prometheus-compatible metrics)
- */
-app.get("/metrics", (_, res) => {
+// /metrics — მხოლოდ localhost-იდან
+app.get("/metrics", (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress || "";
+  if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(ip)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const usage = process.memoryUsage();
   res.setHeader("Content-Type", "text/plain");
   res.send([
     `# HELP encchat_rooms_total Total number of active rooms`,
@@ -470,8 +467,8 @@ app.get("/metrics", (_, res) => {
     ``,
     `# HELP encchat_memory_bytes Memory usage in bytes`,
     `# TYPE encchat_memory_bytes gauge`,
-    `encchat_memory_bytes{type="heap"} ${process.memoryUsage().heapUsed}`,
-    `encchat_memory_bytes{type="rss"} ${process.memoryUsage().rss}`,
+    `encchat_memory_bytes{type="heap"} ${usage.heapUsed}`,
+    `encchat_memory_bytes{type="rss"} ${usage.rss}`,
   ].join("\n"));
 });
 
