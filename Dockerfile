@@ -6,7 +6,7 @@ FROM base AS production
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production && \
+RUN npm install --omit=dev && \
     npm cache clean --force
 
 COPY server.js ./
