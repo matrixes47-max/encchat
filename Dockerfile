@@ -12,6 +12,13 @@ RUN npm install --omit=dev && \
 COPY server.js ./
 COPY public ./public/
 
+# ბიბლიოთეკები CDN-ის გარეშე — ლოკალურად
+RUN cp node_modules/crystals-kyber-js/kyber.min.js public/kyber.min.js 2>/dev/null || \
+    cp $(find node_modules/crystals-kyber-js -name "*.min.js" | head -1) public/kyber.min.js 2>/dev/null || \
+    cp $(find node_modules/crystals-kyber-js -name "*.js" | grep -v node | head -1) public/kyber.min.js && \
+    cp $(find node_modules/argon2-browser/dist -name "argon2.min.js" | head -1) public/argon2.min.js 2>/dev/null || \
+    cp $(find node_modules/argon2-browser -name "*.min.js" | head -1) public/argon2.min.js
+
 RUN addgroup -g 1001 -S encchat && \
     adduser -S encchat -u 1001 && \
     chown -R encchat:encchat /app
