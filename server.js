@@ -84,6 +84,12 @@ app.post("/api/keys", (req, res) => {
   if (!pub  || typeof pub  !== "string" || pub.length  > 100)
     return res.status(400).json({ error: "invalid pub" });
 
+  const { mlkemPub, pqct } = req.body;
+  if (mlkemPub && (typeof mlkemPub !== "string" || mlkemPub.length > 1700))
+    return res.status(400).json({ error: "invalid mlkemPub" });
+  if (pqct && (typeof pqct !== "string" || pqct.length > 1600))
+    return res.status(400).json({ error: "invalid pqct" });
+
   const roomHash = hashRoom(room);
   purgeKeys(roomHash);
 
@@ -91,7 +97,7 @@ app.post("/api/keys", (req, res) => {
 
   // Update if sid already exists, otherwise add
   const idx = ks.findIndex(k => k.sid === sid);
-  const entry = { sid, pub, expires: Date.now() + 24 * 3600 * 1000 };
+  const entry = { sid, pub, mlkemPub: mlkemPub || null, pqct: pqct || null, expires: Date.now() + 24 * 3600 * 1000 };
   if (idx >= 0) ks[idx] = entry;
   else          ks.push(entry);
 
@@ -112,7 +118,7 @@ app.get("/api/keys", (req, res) => {
   purgeKeys(roomHash);
 
   const ks = (keys.get(roomHash) || []).filter(k => k.sid !== sid);
-  res.json({ keys: ks.map(k => ({ sid: k.sid, pub: k.pub })) });
+  res.json({ keys: ks.map(k => ({ sid: k.sid, pub: k.pub, mlkemPub: k.mlkemPub, pqct: k.pqct })) });
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -193,13 +199,13 @@ app.delete("/api/room", (req, res) => {
 });
 
 // ── Health ────────────────────────────────────────────────────────
-app.get("/health", (_, res) => res.json({ status: "ok", version: "3.0-max" }));
+app.get("/health", (_, res) => res.json({ status: "ok", version: "4.0-pq" }));
 
 app.get("*", (_, res) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
 
 app.listen(PORT, () => {
-  console.log(`enc.chat v3 (Argon2id + X25519 + Padding + Fingerprint) on port ${PORT}`);
+  console.log(`enc.chat v4 (PQXDH: ML-KEM-768 + X25519 + Argon2id + Double Ratchet) on port ${PORT}`);
   console.log("Zero-knowledge: server cannot read messages.");
 });
