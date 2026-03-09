@@ -197,48 +197,24 @@ if (CONFIG.TRUST_PROXY) {
 }
 
 app.use(express.json({ limit: CONFIG.MAX_REQUEST_SIZE }));
-// kyber.min.js — node_modules-იდან browser global
-app.get("/kyber.min.js", (req, res) => {
+// kyber.min.js — ESM dynamic import → browser global
+app.get("/kyber.min.js", async (req, res) => {
   try {
-    const vm = require("vm");
-    const kyberPath = path.join(__dirname, "node_modules/crystals-kyber-js");
-    const pkg = JSON.parse(fs.readFileSync(path.join(kyberPath, "package.json"), "utf8"));
-    const mainFile = path.join(kyberPath, pkg.main || "index.js");
-    const src = fs.readFileSync(mainFile, "utf8");
-
-    // CommonJS sandbox
-    const mod = { exports: {} };
-    const requireShim = (name) => {
-      if (name === "crystals-kyber-js") return mod.exports;
-      return require(name);
-    };
-    vm.runInNewContext(src, { module: mod, exports: mod.exports, require: requireShim, Buffer, process });
-
-    const lib = mod.exports;
+    const lib = await import("crystals-kyber-js");
     const K = lib.Kyber768 || lib.default?.Kyber768 || lib.default || lib;
 
-    // Test it works
-    const test = K.KeyGen();
-    if (!test || !test.publicKey) throw new Error("Kyber768.KeyGen() failed");
+    if (typeof K.KeyGen !== "function") throw new Error("Kyber768.KeyGen not found");
 
-    // Build browser script — entire source + window.Kyber768 setter
-    const browser = `(function(){
-var module={exports:{}};
-var exports=module.exports;
-(function(module,exports){
-${src}
-})(module,module.exports);
-var _lib=module.exports;
-window.Kyber768=_lib.Kyber768||(_lib.default&&_lib.default.Kyber768)||_lib.default||_lib;
-if(!window.Kyber768||typeof window.Kyber768.KeyGen!=="function"){
-  console.error("kyber load failed",_lib);
-}
-})();`;
+    const browser = `!function(){
+var _f=${K.KeyGen.toString()};
+var _e=${K.Encrypt.toString()};
+var _d=${K.Decrypt.toString()};
+window.Kyber768={KeyGen:_f,Encrypt:_e,Decrypt:_d};
+}();`;
 
     res.setHeader("Content-Type", "application/javascript");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(browser);
-    console.log("✅ kyber.min.js route OK");
   } catch(e) {
     console.error("❌ kyber route:", e.message);
     res.status(500).send("// kyber error: " + e.message);
