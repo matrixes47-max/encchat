@@ -36,9 +36,24 @@
     text-transform: uppercase;
   }
 
+  #join-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  #join-subtitle {
+    font-size: 11px;
+    color: #cc0000;
+    letter-spacing: 1px;
+    margin-bottom: 40px;
+  }
+
   #join-screen label {
     display: block;
-    color: #444;
+    color: #aaa;
     margin-bottom: 6px;
     font-size: 11px;
     letter-spacing: 2px;
@@ -50,7 +65,7 @@
     width: 100%;
     background: #000;
     border: none;
-    border-bottom: 1px solid #222;
+    border-bottom: 1px solid #555;
     color: #fff;
     font-family: 'Courier New', monospace;
     font-size: 15px;
@@ -59,12 +74,12 @@
     outline: none;
   }
 
-  #join-screen input:focus { border-bottom-color: #555; }
+  #join-screen input:focus { border-bottom-color: #cc0000; }
 
   #join-screen button {
     background: #000;
-    border: 1px solid #333;
-    color: #888;
+    border: 1px solid #8b0000;
+    color: #cc0000;
     font-family: 'Courier New', monospace;
     font-size: 12px;
     padding: 10px 24px;
@@ -74,7 +89,7 @@
     margin-top: 8px;
   }
 
-  #join-screen button:hover { border-color: #fff; color: #fff; }
+  #join-screen button:hover { border-color: #ff0000; color: #ff0000; }
 
   #join-error {
     color: #600;
@@ -85,11 +100,11 @@
   }
 
   #join-info {
-    color: #222;
-    font-size: 11px;
-    margin-top: 44px;
-    line-height: 2;
-    letter-spacing: 1px;
+    color: #888;
+    font-size: 12px;
+    margin-top: 36px;
+    line-height: 2.2;
+    letter-spacing: 0.5px;
   }
 
   /* ── CHAT ── */
@@ -108,15 +123,15 @@
     flex-shrink: 0;
   }
 
-  #header-room { color: #333; font-size: 12px; letter-spacing: 1px; }
-  #header-enc  { color: #1a3a1a; font-size: 11px; letter-spacing: 1px; }
+  #header-room { color: #aaa; font-size: 12px; letter-spacing: 1px; }
+  #header-enc  { color: #cc0000; font-size: 11px; letter-spacing: 1px; }
 
   #leave-btn {
-    background: none; border: none; color: #222;
+    background: none; border: none; color: #5a0000;
     font-family: 'Courier New', monospace;
     font-size: 11px; cursor: pointer; letter-spacing: 1px;
   }
-  #leave-btn:hover { color: #888; }
+  #leave-btn:hover { color: #ff0000; }
 
   #messages {
     flex: 1;
@@ -143,12 +158,12 @@
     border: 1px solid #1a1a1a;
   }
 
-  .msg.mine   .bubble { border-color: #2a2a2a; }
-  .msg.theirs .bubble { border-color: #1a1a1a; color: #ccc; }
+  .msg.mine   .bubble { border-color: #444; color: #fff; }
+  .msg.theirs .bubble { border-color: #333; color: #ddd; }
 
   .msg .meta {
     font-size: 10px;
-    color: #2a2a2a;
+    color: #555;
     margin-top: 5px;
     letter-spacing: 1px;
   }
@@ -167,7 +182,7 @@
     flex: 1;
     background: #000;
     border: none;
-    border-bottom: 1px solid #1a1a1a;
+    border-bottom: 1px solid #444;
     color: #fff;
     font-family: 'Courier New', monospace;
     font-size: 14px;
@@ -177,12 +192,12 @@
     min-height: 28px;
     max-height: 100px;
   }
-  #msg-input:focus { border-bottom-color: #333; }
+  #msg-input:focus { border-bottom-color: #cc0000; }
 
   #ttl-select {
     background: #000;
-    border: 1px solid #111;
-    color: #333;
+    border: 1px solid #333;
+    color: #888;
     font-family: 'Courier New', monospace;
     font-size: 11px;
     padding: 4px 6px;
@@ -190,18 +205,18 @@
     cursor: pointer;
     letter-spacing: 1px;
   }
-  #ttl-select:hover { border-color: #333; color: #666; }
+  #ttl-select:hover { border-color: #cc0000; color: #cc0000; }
 
   #send-btn {
-    background: none; border: none; color: #333;
+    background: none; border: none; color: #cc0000;
     font-family: 'Courier New', monospace;
     font-size: 12px; cursor: pointer; letter-spacing: 1px;
     white-space: nowrap; padding: 4px 0;
   }
-  #send-btn:hover { color: #fff; }
+  #send-btn:hover { color: #ff0000; }
 
   #status-bar {
-    text-align: center; font-size: 10px; color: #111;
+    text-align: center; font-size: 10px; color: #333;
     padding: 5px; letter-spacing: 2px; flex-shrink: 0;
   }
 
@@ -215,7 +230,8 @@
 
 <!-- JOIN -->
 <div id="join-screen">
-  <h1>enc.chat</h1>
+  <div id="join-title">დაშიფრული ჩეთი</div>
+  <div id="join-subtitle">enc.chat — ანონიმური · Zero-Knowledge · AES-256-GCM</div>
 
   <label>ოთახის კოდი</label>
   <input type="text" id="room-input" placeholder="ნებისმიერი კოდი" autocomplete="off" spellcheck="false">
@@ -231,7 +247,7 @@
     — პაროლი სერვერს არ ეგზავნება<br>
     — სერვერი მხოლოდ დაშიფრულ bytes-ებს ხედავს<br>
     — IP არ ინახება, სახელი არ ინახება<br>
-    — AES-256-GCM · PBKDF2 · Zero-Knowledge
+    — შეტყობინება თვითგანადგურდება არჩეული დროის შემდეგ
   </div>
 </div>
 
