@@ -197,8 +197,9 @@ function isValidBase64(str, maxLength) {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function hashRoom(roomId) {
-  return crypto.createHash("sha256").update(roomId.toLowerCase().trim()).digest("hex");
+// room ID client-side არის hash-ებული — სერვერი პირდაპირ იყენებს
+function getRoomHash(roomId) {
+  return roomId; // უკვე hash-ია client-იდან
 }
 
 function purgeRoom(roomHash) {
@@ -278,7 +279,7 @@ app.post("/api/keys", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) =>
   if (pqct && !isValidBase64(pqct, 1600))
     return res.status(400).json({ error: "invalid pqct" });
 
-  const roomHash = hashRoom(room);
+  const roomHash = getRoomHash(room);
   purgeKeys(roomHash);
 
   const ks = keys.get(roomHash) || [];
@@ -315,7 +316,7 @@ app.get("/api/keys", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => 
   if (!isValidString(room, CONFIG.MAX_ROOM_LENGTH)) 
     return res.json({ keys: [] });
 
-  const roomHash = hashRoom(room);
+  const roomHash = getRoomHash(room);
   purgeKeys(roomHash);
 
   const ks = (keys.get(roomHash) || []).filter(k => k.sid !== sid);
@@ -342,7 +343,7 @@ app.get("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res)
   if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH)) 
     return res.json({ messages: [] });
 
-  const roomHash = hashRoom(roomId);
+  const roomHash = getRoomHash(roomId);
   purgeRoom(roomHash);
 
   res.json({ messages: rooms.get(roomHash) || [] });
@@ -380,7 +381,7 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
     CONFIG.MAX_TTL
   );
   
-  const roomHash = hashRoom(room);
+  const roomHash = getRoomHash(room);
 
   purgeRoom(roomHash);
   const msgs = rooms.get(roomHash) || [];
@@ -417,7 +418,7 @@ app.delete("/api/room", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) 
     return res.status(400).json({ error: "invalid room" });
   }
   
-  const rh = hashRoom(roomId);
+  const rh = getRoomHash(roomId);
   const hadRooms = rooms.has(rh);
   const hadKeys = keys.has(rh);
   
