@@ -131,6 +131,15 @@
   #header-room { color: #aaa; font-size: 12px; letter-spacing: 1px; }
   #header-enc  { color: #cc0000; font-size: 11px; letter-spacing: 1px; }
 
+  .dr-status {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border: 1px solid;
+  }
+  .dr-waiting { color: #555; border-color: #222; }
+  .dr-ready   { color: #006600; border-color: #004400; }
+
   #leave-btn {
     background: none; border: none; color: #5a0000;
     font-family: 'Courier New', monospace;
@@ -340,7 +349,7 @@
 <!-- JOIN -->
 <div id="join-screen">
   <div id="join-title">დაშიფრული ჩათი</div>
-  <div id="join-subtitle">enc.chat — ანონიმური · Zero-Knowledge · AES-256-GCM</div>
+  <div id="join-subtitle">enc.chat — ანონიმური · Zero-Knowledge · Double Ratchet · AES-256-GCM</div>
 
   <label>ოთახის კოდი</label>
   <div class="input-row">
@@ -374,10 +383,10 @@
   <div id="join-error"></div>
 
   <div id="join-info">
-    — პაროლი სერვერს არ ეგზავნება<br>
-    — სერვერი მხოლოდ დაშიფრულ bytes-ებს ხედავს<br>
-    — IP არ ინახება, სახელი არ ინახება<br>
-    — შეტყობინება თვითგანადგურდება არჩეული დროის შემდეგ
+    — Double Ratchet: ყოველ შეტყობინებას უნიკალური გასაღები<br>
+    — P-256 ECDH + ChaCha20 + AES-256-GCM<br>
+    — პაროლი სერვერს არ ეგზავნება · IP არ ინახება<br>
+    — შეტყობინება თვითგანადგურდება
   </div>
 </div>
 
@@ -385,7 +394,7 @@
 <div id="chat-screen">
   <div id="chat-header">
     <span id="header-room"></span>
-    <span id="header-enc">ჩ ა თ ი</span>
+    <span id="dr-status" class="dr-status dr-waiting">⏳ მეორე მომხმარებელს ელოდება...</span>
     <button id="leave-btn">გასვლა</button>
   </div>
 
@@ -402,7 +411,7 @@
     <button id="send-btn">[ გაგზავნა ]</button>
   </div>
 
-  <div id="status-bar">zero-knowledge · aes-256-gcm · no logs · no ip</div>
+  <div id="status-bar">double ratchet · zero-knowledge · aes-256-gcm + chacha20 · no logs · no ip</div>
 </div>
 
 <script src="/app.js"></script>
