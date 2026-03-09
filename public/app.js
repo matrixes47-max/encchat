@@ -1,7 +1,52 @@
 "use strict";
 
 // ══════════════════════════════════════════════════════
-// CRYPTO — ყველაფერი client-ზე, სერვერი ვერაფერს ხედავს
+// CHACHA20 — Pure JS implementation (Web Crypto არ იცნობს)
+// ══════════════════════════════════════════════════════
+
+function chacha20Block(key, counter, nonce) {
+  const c = new Uint32Array(16);
+  // constants
+  c[0]=0x61707865; c[1]=0x3320646e; c[2]=0x79622d32; c[3]=0x6b206574;
+  // key (8 x 32bit)
+  const k = new DataView(key.buffer, key.byteOffset);
+  for (let i=0;i<8;i++) c[4+i] = k.getUint32(i*4, true);
+  // counter + nonce
+  c[12] = counter;
+  const n = new DataView(nonce.buffer, nonce.byteOffset);
+  c[13] = n.getUint32(0, true);
+  c[14] = n.getUint32(4, true);
+  c[15] = n.getUint32(8, true);
+
+  const x = new Uint32Array(c);
+  const rot = (v,n) => (v<<n)|(v>>>(32-n));
+  const qr = (a,b,cc,d) => {
+    x[a]+=x[b]; x[d]=rot(x[d]^x[a],16);
+    x[cc]+=x[d]; x[b]=rot(x[b]^x[cc],12);
+    x[a]+=x[b]; x[d]=rot(x[d]^x[a],8);
+    x[cc]+=x[d]; x[b]=rot(x[b]^x[cc],7);
+  };
+  for (let i=0;i<10;i++) {
+    qr(0,4,8,12); qr(1,5,9,13); qr(2,6,10,14); qr(3,7,11,15);
+    qr(0,5,10,15); qr(1,6,11,12); qr(2,7,8,13); qr(3,4,9,14);
+  }
+  for (let i=0;i<16;i++) x[i]+=c[i];
+  return new Uint8Array(x.buffer);
+}
+
+function chacha20Xor(keyBytes, nonce, data) {
+  const out = new Uint8Array(data.length);
+  for (let i=0; i<data.length; i+=64) {
+    const block = chacha20Block(keyBytes, Math.floor(i/64), nonce);
+    for (let j=0; j<64 && i+j<data.length; j++) {
+      out[i+j] = data[i+j] ^ block[j];
+    }
+  }
+  return out;
+}
+
+// ══════════════════════════════════════════════════════
+// CRYPTO — AES-256-GCM + ChaCha20 ორმაგი შიფრი
 // ══════════════════════════════════════════════════════
 
 async function deriveKey(password, roomId) {
@@ -23,24 +68,59 @@ async function deriveKey(password, roomId) {
   );
 }
 
-async function encryptMsg(text, key) {
+// ChaCha20 გასაღები პაროლიდან (32 byte)
+async function deriveChaChaKey(password, roomId) {
   const enc = new TextEncoder();
-  const iv  = crypto.getRandomValues(new Uint8Array(12));
-  const ct  = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(text));
-  const buf = new Uint8Array(12 + ct.byteLength);
-  buf.set(iv);
-  buf.set(new Uint8Array(ct), 12);
+  const raw = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("chacha20-" + roomId.toLowerCase().trim()),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    raw, 256
+  );
+  return new Uint8Array(bits);
+}
+
+// პაროლი და roomId globally ვინახავთ ChaCha20-სთვის
+let _chachaKey = null;
+
+async function encryptMsg(text, aesKey) {
+  const enc = new TextEncoder();
+  const plainBytes = enc.encode(text);
+
+  // ── ეტაპი 1: ChaCha20 ──
+  const chachaNonce = crypto.getRandomValues(new Uint8Array(12));
+  const afterChacha = chacha20Xor(_chachaKey, chachaNonce, plainBytes);
+
+  // ── ეტაპი 2: AES-256-GCM ──
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, afterChacha);
+
+  // ── შეფუთვა: chachaNonce(12) + iv(12) + ciphertext ──
+  const buf = new Uint8Array(12 + 12 + ct.byteLength);
+  buf.set(chachaNonce, 0);
+  buf.set(iv, 12);
+  buf.set(new Uint8Array(ct), 24);
   return btoa(String.fromCharCode(...buf));
 }
 
-async function decryptMsg(b64, key) {
+async function decryptMsg(b64, aesKey) {
   try {
-    const buf   = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: buf.slice(0, 12) },
-      key,
-      buf.slice(12)
-    );
+    const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const chachaNonce = buf.slice(0, 12);
+    const iv          = buf.slice(12, 24);
+    const ct          = buf.slice(24);
+
+    // ── ეტაპი 1: AES-256-GCM გაშიფვრა ──
+    const afterAes = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
+
+    // ── ეტაპი 2: ChaCha20 გაშიფვრა ──
+    const plain = chacha20Xor(_chachaKey, chachaNonce, new Uint8Array(afterAes));
     return new TextDecoder().decode(plain);
   } catch { return null; }
 }
@@ -106,6 +186,7 @@ async function joinRoom() {
 
   try {
     currentKey  = await deriveKey(pass, room);
+    _chachaKey  = await deriveChaChaKey(pass, room);
     currentRoom = room;
 
     document.getElementById("header-room").textContent = room;
