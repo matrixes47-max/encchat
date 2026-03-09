@@ -491,11 +491,13 @@ async function tryInitPQXDH() {
       mlkemSS = sharedSecret;
 
       // Upload our pqct so they can decapsulate
+      // FIX: roomHash გამოვიყენოთ — currentRoom (plain) კი არა
+      const pqctRoomHash = await hashRoomId(currentRoom);
       await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          room:      currentRoom,
+          room:      pqctRoomHash,
           sid:       SESSION_ID,
           pub:       _myX25519B64,
           mlkemPub:  bufToB64(_myMlkemPub),
@@ -610,15 +612,26 @@ function wipeDR() {
 function wipeSessionKeys() {
   zeroBytes(_argon2SK);
   if (_myMlkemPriv instanceof Uint8Array) zeroBytes(_myMlkemPriv);
-  // X25519 CryptoKey-ები Web Crypto-ს გამო პირდაპირ ვერ ვმუდოებთ,
-  // მაგრამ reference-ს ვაშლით — GC-ს გადავცემთ
+  // ⚠️ Web Crypto API შეზღუდვა: X25519 CryptoKey object-ების raw bytes
+  // პირდაპირ მიუწვდომელია JS-იდან — browser secure memory-შია.
+  // reference-ის null-ად ქცევა GC-ს გადასცემს კონტროლს.
+  // სრული zeroing შეუძლებელია ბრაუზერის sandbox-ის გარეთ.
   _myX25519 = null; _myX25519B64 = null;
   _myMlkemPriv = null; _myMlkemPub = null; _argon2SK = null;
 }
 
-function leaveRoom() {
+async function leaveRoom() {
   clearInterval(pollInterval);
   clearInterval(tickInterval);
+  // სერვერს ვატყობინებთ — sid proof of membership
+  if (currentRoom) {
+    try {
+      const roomHash = await hashRoomId(currentRoom);
+      await fetch(`/api/room?room=${encodeURIComponent(roomHash)}&sid=${SESSION_ID}`, {
+        method: "DELETE"
+      });
+    } catch { /* silent — wipe happens regardless */ }
+  }
   wipeDR();
   wipeSessionKeys();
   currentRoom = ""; _pendingInit = null;
@@ -772,10 +785,17 @@ window.addEventListener("beforeunload", () => {
   wipeSessionKeys();
 });
 
-// tab background-ში გადავიდა → key material-ს ვწმენდთ
+// tab background-ში გადავიდა → გასაღებები ვინახავთ (UX),
+// მხოლოდ beforeunload-ზე ვწმენდთ სრულად.
+// visibilitychange-ზე poll-ს ვაჩერებთ მხოლოდ, არ ვწმენდთ keys.
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden" && currentRoom) {
-    wipeDR();
-    wipeSessionKeys();
+    // poll-ს ვაჩერებთ — battery + bandwidth
+    clearInterval(pollInterval);
+  } else if (document.visibilityState === "visible" && currentRoom) {
+    // tab-ი დაბრუნდა — poll-ს ვუბრუნებთ
+    clearInterval(pollInterval);
+    pollInterval = setInterval(poll, 3000);
+    poll();
   }
 });
