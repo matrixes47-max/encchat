@@ -548,8 +548,16 @@
   <div id="status-bar">ml-kem-768 · x25519 · pqxdh · argon2id · double ratchet · aes-256-gcm · chacha20 · no ip</div>
 </div>
 
-<script src="/kyber.min.js"></script>
 <script src="/argon2.min.js"></script>
-<script src="/app.js"></script>
+<script type="module">
+  import { Kyber768, Kyber512, Kyber1024 } from "https://esm.sh/crystals-kyber-js@1.1.2";
+  window.Kyber768 = Kyber768;
+  window.Kyber512 = Kyber512;
+  window.Kyber1024 = Kyber1024;
+  // app.js-ს ვტვირთავთ Kyber-ის ინიციალიზაციის შემდეგ
+  const s = document.createElement('script');
+  s.src = '/app.js';
+  document.head.appendChild(s);
+</script>
 </body>
 </html>
