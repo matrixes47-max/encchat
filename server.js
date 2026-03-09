@@ -1,10 +1,12 @@
 /**
- * enc.chat — Zero-Knowledge Encrypted Chat Server
+ * enc.chat v2 — Zero-Knowledge Encrypted Chat Server
+ * Double Ratchet Edition
  *
- * რაც ამ სერვერმა არ იცის:
- *  - შეტყობინებების შინაარსი (ყველაფერი AES-256-GCM-ით დაშიფრულია client-ზე)
- *  - პაროლი (არასდროს გადმოდის client-დან)
- *  - მომხმარებლის ვინაობა (IP არ ინახება, სახელი არ ინახება)
+ * სერვერმა არ იცის:
+ *  - შეტყობინებების შინაარსი (ChaCha20 + AES-256-GCM, client-side)
+ *  - პაროლი (არასდროს გადმოდის)
+ *  - ვინაობა (IP არ ინახება)
+ *  - ECDH private key-ები (მხოლოდ RAM-ში, client-side)
  */
 
 const express = require("express");
@@ -14,11 +16,11 @@ const path    = require("path");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── In-memory store (გამოყენება: Map<roomHash, Message[]>) ──
-// არ ვიყენებთ DB-ს — მეხსიერება სერვერის გადატვირთვისას სრულად ქრება
-const rooms = new Map();
+// ── In-memory stores ──────────────────────────────────────────────
+const rooms = new Map();   // roomHash → Message[]
+const keys  = new Map();   // roomHash → {sid, pub, expires}[]
 
-// ── Security headers ──────────────────────────────────────
+// ── Security headers ──────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -29,45 +31,96 @@ app.use((req, res, next) => {
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'"
   );
-  // IP არ ვინახავთ — request log გამორთულია
   next();
 });
 
 app.use(express.json({ limit: "64kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// ── Room ID hash (რომ სერვერმა ოთახის სახელი არ იცოდეს) ─
+// ── Helpers ───────────────────────────────────────────────────────
 function hashRoom(roomId) {
   return crypto.createHash("sha256").update(roomId.toLowerCase().trim()).digest("hex");
 }
 
-// ── Purge expired messages ────────────────────────────────
 function purgeRoom(roomHash) {
   const msgs = rooms.get(roomHash);
   if (!msgs) return;
-  const now = Date.now();
+  const now   = Date.now();
   const alive = msgs.filter(m => m.expires > now);
-  if (alive.length === 0) {
-    rooms.delete(roomHash); // ოთახი სრულად იშლება
-  } else {
-    rooms.set(roomHash, alive);
-  }
+  alive.length === 0 ? rooms.delete(roomHash) : rooms.set(roomHash, alive);
 }
 
-// ── Background cleanup (ყოველ 30 წამში) ─────────────────
+function purgeKeys(roomHash) {
+  const ks = keys.get(roomHash);
+  if (!ks) return;
+  const now   = Date.now();
+  const alive = ks.filter(k => k.expires > now);
+  alive.length === 0 ? keys.delete(roomHash) : keys.set(roomHash, alive);
+}
+
+// Background cleanup every 30s
 setInterval(() => {
-  for (const roomHash of rooms.keys()) {
-    purgeRoom(roomHash);
-  }
+  for (const rh of rooms.keys()) purgeRoom(rh);
+  for (const rh of keys.keys())  purgeKeys(rh);
 }, 30_000);
 
-// ══════════════════════════════════════════════════════════
-// API ROUTES
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// API — KEYS (Double Ratchet public key exchange)
+// ══════════════════════════════════════════════════════════════════
 
 /**
- * GET /api/messages?room=<roomId>
- * დაბრუნება: დაშიფრული blob-ების სია (სერვერმა შინაარსი არ იცის)
+ * POST /api/keys
+ * body: { room, sid, pub }
+ * pub — base64 P-256 ECDH public key (65 bytes raw)
+ * სერვერი ინახავს მხოლოდ public key-ს — private key client-ზეა
+ */
+app.post("/api/keys", (req, res) => {
+  const { room, sid, pub } = req.body;
+
+  if (!room || typeof room !== "string" || room.length > 128)
+    return res.status(400).json({ error: "invalid room" });
+  if (!sid  || typeof sid  !== "string" || sid.length  > 64)
+    return res.status(400).json({ error: "invalid sid" });
+  if (!pub  || typeof pub  !== "string" || pub.length  > 200)
+    return res.status(400).json({ error: "invalid pub" });
+
+  const roomHash = hashRoom(room);
+  purgeKeys(roomHash);
+
+  const ks = keys.get(roomHash) || [];
+
+  // Update if sid already exists, otherwise add
+  const idx = ks.findIndex(k => k.sid === sid);
+  const entry = { sid, pub, expires: Date.now() + 24 * 3600 * 1000 };
+  if (idx >= 0) ks[idx] = entry;
+  else          ks.push(entry);
+
+  keys.set(roomHash, ks);
+  res.json({ ok: true });
+});
+
+/**
+ * GET /api/keys?room=X&sid=MY_SID
+ * Returns all public keys in room EXCEPT own sid
+ */
+app.get("/api/keys", (req, res) => {
+  const { room, sid } = req.query;
+
+  if (!room || room.length > 128) return res.json({ keys: [] });
+
+  const roomHash = hashRoom(room);
+  purgeKeys(roomHash);
+
+  const ks = (keys.get(roomHash) || []).filter(k => k.sid !== sid);
+  res.json({ keys: ks.map(k => ({ sid: k.sid, pub: k.pub })) });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// API — MESSAGES
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/messages?room=X
  */
 app.get("/api/messages", (req, res) => {
   const roomId = req.query.room;
@@ -76,75 +129,77 @@ app.get("/api/messages", (req, res) => {
   const roomHash = hashRoom(roomId);
   purgeRoom(roomHash);
 
-  const msgs = rooms.get(roomHash) || [];
-  // client-ს ვუგზავნით მხოლოდ: id, enc (blob), sid, ts, expires
-  res.json({ messages: msgs });
+  res.json({ messages: rooms.get(roomHash) || [] });
 });
 
 /**
  * POST /api/messages
- * body: { room, enc, sid, ttl }
- * enc — AES-256-GCM დაშიფრული blob (სერვერს ვერ გაშიფრავს)
- * sid — session id (anonymous, client-side generated)
- * ttl — seconds until deletion
+ * body: { room, enc, sid, dhPub, msgN, prevN, ttl }
+ *
+ * enc   — double-encrypted ciphertext blob (ChaCha20 + AES-256-GCM)
+ * dhPub — sender's current ECDH public key (for Double Ratchet header)
+ * msgN  — message index in current sending chain
+ * prevN — previous sending chain length (PN)
  */
 app.post("/api/messages", (req, res) => {
-  const { room, enc, sid, ttl } = req.body;
+  const { room, enc, sid, dhPub, msgN, prevN, ttl } = req.body;
 
-  // ── Validation ──
-  if (!room || typeof room !== "string" || room.length > 128)
+  if (!room  || typeof room  !== "string" || room.length  > 128)
     return res.status(400).json({ error: "invalid room" });
-  if (!enc || typeof enc !== "string" || enc.length > 8192)
+  if (!enc   || typeof enc   !== "string" || enc.length   > 16384)
     return res.status(400).json({ error: "invalid message" });
-  if (!sid || typeof sid !== "string" || sid.length > 64)
+  if (!sid   || typeof sid   !== "string" || sid.length   > 64)
     return res.status(400).json({ error: "invalid session" });
+  if (!dhPub || typeof dhPub !== "string" || dhPub.length > 200)
+    return res.status(400).json({ error: "invalid dhPub" });
+  if (typeof msgN  !== "number" || msgN  < 0 || msgN  > 100000)
+    return res.status(400).json({ error: "invalid msgN" });
+  if (typeof prevN !== "number" || prevN < 0 || prevN > 100000)
+    return res.status(400).json({ error: "invalid prevN" });
 
-  const ttlSecs = Math.min(Math.max(parseInt(ttl) || 300, 10), 86400);
+  const ttlSecs  = Math.min(Math.max(parseInt(ttl) || 300, 10), 86400);
   const roomHash = hashRoom(room);
 
   purgeRoom(roomHash);
-
   const msgs = rooms.get(roomHash) || [];
-
-  // Max 500 messages per room
-  if (msgs.length >= 500)
-    return res.status(429).json({ error: "room full" });
+  if (msgs.length >= 500) return res.status(429).json({ error: "room full" });
 
   const record = {
     id:      crypto.randomUUID(),
-    enc,                              // მხოლოდ დაშიფრული blob
-    sid,                              // anonymous session id
+    enc,
+    sid,
+    dhPub,           // Double Ratchet header — sender's current DH public key
+    msgN,            // message counter in chain
+    prevN,           // previous chain length
     ts:      Date.now(),
     expires: Date.now() + ttlSecs * 1000
-    // IP არ ინახება!
   };
 
   msgs.push(record);
   rooms.set(roomHash, msgs);
-
   res.json({ ok: true, id: record.id });
 });
 
 /**
- * DELETE /api/room?room=<roomId>
- * ოთახის ყველა შეტყობინება სამუდამოდ იშლება
+ * DELETE /api/room?room=X
  */
 app.delete("/api/room", (req, res) => {
   const roomId = req.query.room;
   if (!roomId) return res.status(400).json({ error: "invalid room" });
-  rooms.delete(hashRoom(roomId));
+  const rh = hashRoom(roomId);
+  rooms.delete(rh);
+  keys.delete(rh);
   res.json({ ok: true });
 });
 
-// ── Health check ──────────────────────────────────────────
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+// ── Health ────────────────────────────────────────────────────────
+app.get("/health", (_, res) => res.json({ status: "ok", version: "2.0-dr" }));
 
-// ── 404 → index.html ─────────────────────────────────────
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+app.get("*", (_, res) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
 app.listen(PORT, () => {
-  console.log(`enc.chat server running on port ${PORT}`);
-  console.log("Zero-knowledge mode: server cannot read messages.");
+  console.log(`enc.chat v2 (Double Ratchet) on port ${PORT}`);
+  console.log("Zero-knowledge: server cannot read messages.");
 });
