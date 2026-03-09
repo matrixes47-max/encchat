@@ -287,9 +287,11 @@ async function initDR(sk, myX25519Keypair, myX25519B64, theirX25519B64) {
   const theirPub = await importX25519Pub(theirX25519B64);
   const dhOut    = await x25519DH(myX25519Keypair.privateKey, theirPub);
 
-  const init64 = await hkdf(dhOut, sk, "enc.chat-dr-init-v4", 64);
-  const rk     = await hkdf(dhOut, sk, "enc.chat-dr-root-v4", 32);
-  const isAlice = myX25519B64 < theirX25519B64;
+  // FIX: ერთი 96-byte HKDF call — ორი ცალკე call-ის მაგივრად (იგივე security, ნახევარი სამუშაო)
+  const derived96 = await hkdf(dhOut, sk, "enc.chat-dr-init-v4", 96);
+  const init64    = derived96.slice(0, 64);
+  const rk        = derived96.slice(64, 96);
+  const isAlice   = myX25519B64 < theirX25519B64;
 
   dr = newDRState();
   dr.DHs    = myX25519Keypair;
@@ -400,9 +402,21 @@ const sentCache = new Map();
 function generateCodes() {
   const chars   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const special = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+
+  // FIX: rejection sampling — modulo bias ამოღებულია
+  // cs.length-ის ჯერადი ზღვარი: ბაიტები ამ ზღვარს ზემოთ უგულვებელყოფება
   const randStr = (len, cs) => {
-    const a = new Uint8Array(len); crypto.getRandomValues(a);
-    return Array.from(a).map(b => cs[b % cs.length]).join("");
+    const limit = 256 - (256 % cs.length); // e.g. 62→248, 70→210
+    const out = [];
+    while (out.length < len) {
+      const buf = new Uint8Array(len * 2);
+      crypto.getRandomValues(buf);
+      for (const b of buf) {
+        if (out.length >= len) break;
+        if (b < limit) out.push(cs[b % cs.length]);
+      }
+    }
+    return out.join("");
   };
   const room = randStr(64, chars);
   const pass = randStr(128, special);
@@ -528,7 +542,7 @@ async function tryInitPQXDH() {
 
 async function joinRoom() {
   const room = document.getElementById("room-input").value.trim();
-  const pass = document.getElementById("pass-input").value;
+  const pass = document.getElementById("pass-input").value.trim(); // FIX: trailing spaces პაროლს ვარღვევდა
   if (!room || !pass)          { showError("ოთახის კოდი და პაროლი საჭიროა."); return; }
   if (room.length > 128 || pass.length > 256) { showError("ძალიან გრძელი."); return; }
 
