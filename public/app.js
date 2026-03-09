@@ -87,6 +87,14 @@ function concatBuffers(...arrays) {
 }
 
 
+// ── Room ID Hashing ───────────────────────────────────────────────
+// სერვერი room-ის სახელს არასოდეს ხედავს — მხოლოდ hash-ს ვაგზავნით
+async function hashRoomId(roomId) {
+  const data = new TextEncoder().encode("enc.chat-room-v4:" + roomId.toLowerCase().trim());
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return bufToB64(new Uint8Array(digest));
+}
+
 // ── KDF ───────────────────────────────────────────────────────────
 
 async function hkdf(ikm, salt, info, length = 32) {
@@ -460,7 +468,8 @@ function updateDRStatus() {
 
 async function tryInitPQXDH() {
   try {
-    const res  = await fetch(`/api/keys?room=${encodeURIComponent(currentRoom)}&sid=${SESSION_ID}`);
+    const roomHash = await hashRoomId(currentRoom);
+    const res  = await fetch(`/api/keys?room=${encodeURIComponent(roomHash)}&sid=${SESSION_ID}`);
     const data = await res.json();
     if (!data.keys || data.keys.length === 0) return false;
 
@@ -536,12 +545,13 @@ async function joinRoom() {
     _myMlkemPub  = mlkemKeys.publicKey;
     showJoinStatus("");
 
-    // 4. Register both public keys
+    // 4. Register both public keys — room hash-ი, სახელი არ გადაიცემა
+    const roomHash = await hashRoomId(room);
     await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        room,
+        room:     roomHash,
         sid:      SESSION_ID,
         pub:      _myX25519B64,
         mlkemPub: bufToB64(_myMlkemPub)
@@ -637,11 +647,12 @@ async function sendMessage() {
   const ttl = parseInt(document.getElementById("ttl-select").value);
   try {
     const { enc, header } = await ratchetEncrypt(text);
+    const roomHash = await hashRoomId(currentRoom);
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        room: currentRoom, enc, sid: SESSION_ID,
+        room: roomHash, enc, sid: SESSION_ID,
         dhPub: header.dh, msgN: header.n, prevN: header.pn, ttl
       })
     });
@@ -675,7 +686,8 @@ function autoResize(el) {
 
 async function fetchAndRender() {
   try {
-    const res  = await fetch(`/api/messages?room=${encodeURIComponent(currentRoom)}`);
+    const roomHash = await hashRoomId(currentRoom);
+    const res  = await fetch(`/api/messages?room=${encodeURIComponent(roomHash)}`);
     const data = await res.json();
     await renderMessages(data.messages || []);
   } catch { /* silent */ }
