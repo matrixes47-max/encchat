@@ -59,8 +59,8 @@ function generateCodes() {
     return Array.from(arr).map(b => charset[b % charset.length]).join("");
   };
 
-  const room = randStr(24, chars);
-  const pass = randStr(32, special);
+  const room = randStr(64, chars);
+  const pass = randStr(128, special);
 
   document.getElementById("gen-room").textContent = room;
   document.getElementById("gen-pass").textContent = pass;
