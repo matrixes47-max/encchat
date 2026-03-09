@@ -1,27 +1,24 @@
 "use strict";
 
 // ════════════════════════════════════════════════════════════════════
-//  enc.chat v3 — Maximum Security Edition
+//  enc.chat v4 — Post-Quantum Maximum Security Edition
 //
 //  კრიპტოგრაფიული სტეკი:
-//    1. Argon2id (mem=64MB, iter=3) → SK — PBKDF2-ზე 100x ძლიერი
-//    2. X25519 ECDH                 → DH key exchange (Curve25519)
-//    3. HKDF-SHA256                 → Root Key + Chain Keys
-//    4. HMAC-SHA256 (KDF_CK)        → Message Keys
-//    5. Message Padding (256B)      → სიგრძე არ ჩანს
-//    6. ChaCha20                    → პირველი შიფრი
-//    7. AES-256-GCM                 → მეორე შიფრი
-//    8. HTTPS/TLS                   → მესამე შიფრი
-//    + Key Fingerprint              → MITM შეუძლებელია
+//    1. Argon2id (mem=64MB, iter=3) → SK
+//    2. PQXDH Hybrid Key Exchange:
+//         X25519 ECDH              → კლასიკური DH
+//         ML-KEM-768 (Kyber)       → კვანტური KEM
+//         SK = HKDF(x25519_dh ‖ mlkem_ss) → ორივე გარე ერთდროულად
+//    3. HKDF-SHA256                → Root Key + Chain Keys
+//    4. HMAC-SHA256 (KDF_CK)       → Message Keys
+//    5. Message Padding (256B)     → სიგრძე არ ჩანს
+//    6. ChaCha20                   → პირველი შიფრი
+//    7. AES-256-GCM                → მეორე შიფრი
+//    8. HTTPS/TLS                  → მესამე შიფრი
+//    + Key Fingerprint             → MITM შეუძლებელია
 //
-//  Signal-ზე უკეთესი:
-//    ✓ Argon2id (Signal: PBKDF2)
-//    ✓ X25519 + Double Ratchet (Signal: იგივე ✓)
-//    ✓ ანონიმური — ნომერი არ სჭირდება (Signal: ❌)
-//    ✓ 8 ფენა (Signal: 5)
-//    ✓ IP არ ინახება (Signal: ❌)
-//    ✓ Message Padding (Signal: ✓)
-//    ✓ Key Fingerprint (Signal: ✓)
+//  კვანტური კომპიუტერი ვერ გატეხს — ML-KEM-768 NIST 2024 სტანდარტი
+//  Signal PQXDH-ს 2023-ში დაამატა — ჩვენ ახლა ვამატებთ
 // ════════════════════════════════════════════════════════════════════
 
 
@@ -81,8 +78,16 @@ function bytesToHex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
+function concatBuffers(...arrays) {
+  const total = arrays.reduce((n, a) => n + a.length, 0);
+  const out   = new Uint8Array(total);
+  let offset  = 0;
+  for (const a of arrays) { out.set(a, offset); offset += a.length; }
+  return out;
+}
 
-// ── KDF Functions ─────────────────────────────────────────────────
+
+// ── KDF ───────────────────────────────────────────────────────────
 
 async function hkdf(ikm, salt, info, length = 32) {
   const key = await crypto.subtle.importKey(
@@ -113,7 +118,7 @@ async function hmacSHA256(key, data) {
 }
 
 async function kdfRK(rk, dhOut) {
-  const out64 = await hkdf(dhOut, rk, "enc.chat-rk-v3", 64);
+  const out64 = await hkdf(dhOut, rk, "enc.chat-rk-v4", 64);
   return [out64.slice(0, 32), out64.slice(32)];
 }
 
@@ -124,8 +129,8 @@ async function kdfCK(ck) {
 }
 
 async function expandMK(mk) {
-  const aesBytes    = await hkdf(mk, new Uint8Array(32), "enc.chat-mk-aes-v3",    32);
-  const chachaBytes = await hkdf(mk, new Uint8Array(32), "enc.chat-mk-chacha-v3", 32);
+  const aesBytes    = await hkdf(mk, new Uint8Array(32), "enc.chat-mk-aes-v4",    32);
+  const chachaBytes = await hkdf(mk, new Uint8Array(32), "enc.chat-mk-chacha-v4", 32);
   const aesKey = await crypto.subtle.importKey(
     "raw", aesBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
   );
@@ -134,93 +139,107 @@ async function expandMK(mk) {
 
 
 // ════════════════════════════════════════════════════════════════════
-//  1. ARGON2ID — PBKDF2-ზე 100x ძლიერი (memory-hard)
-//  Signal იყენებს PBKDF2-ს. ჩვენ — Argon2id.
+//  ARGON2ID
 // ════════════════════════════════════════════════════════════════════
 
 async function deriveSK_Argon2id(password, roomId) {
-  // salt = SHA-256(roomId) — deterministic, 32 bytes
   const saltRaw = await crypto.subtle.digest(
-    "SHA-256", new TextEncoder().encode("enc.chat-v3-" + roomId.toLowerCase().trim())
+    "SHA-256", new TextEncoder().encode("enc.chat-v4-" + roomId.toLowerCase().trim())
   );
   const salt = new Uint8Array(saltRaw);
-
-  showJoinStatus("🔐 Argon2id...");
-
+  showJoinStatus("🔐 Argon2id — 3-5 წამი...");
   const result = await argon2.hash({
-    pass: password,
-    salt,
+    pass: password, salt,
     type: argon2.ArgonType.Argon2id,
-    mem:  65536,   // 64 MB — brute force პრაქტიკულად შეუძლებელი
-    time: 3,       // 3 iteration
-    parallelism: 1,
-    hashLen: 32
+    mem: 65536, time: 3, parallelism: 1, hashLen: 32
   });
-
   showJoinStatus("");
-  return result.hash; // Uint8Array(32)
+  return result.hash;
 }
 
 
 // ════════════════════════════════════════════════════════════════════
-//  2. X25519 ECDH — Curve25519 (Signal-ის სტანდარტი)
-//  P-256 NIST-ის სტანდარტია — ზოგი კრიპტოგრაფი არ ენდობა.
-//  X25519 — WhatsApp, Signal, WireGuard იყენებს.
+//  X25519 ECDH
 // ════════════════════════════════════════════════════════════════════
 
-async function generateDHKeypair() {
-  return crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "X25519" },
-    true, ["deriveBits"]
-  );
+async function generateX25519() {
+  return crypto.subtle.generateKey({ name: "ECDH", namedCurve: "X25519" }, true, ["deriveBits"]);
 }
 
-async function dhExchange(privateKey, publicKey) {
-  const bits = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: publicKey },
-    privateKey, 256
-  );
+async function x25519DH(privateKey, publicKey) {
+  const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
   return new Uint8Array(bits);
 }
 
-async function exportPub(keypair) {
-  const raw = await crypto.subtle.exportKey("raw", keypair.publicKey);
-  return bufToB64(raw); // X25519 pub key = 32 bytes = 44 chars base64
+async function exportX25519Pub(keypair) {
+  return bufToB64(new Uint8Array(await crypto.subtle.exportKey("raw", keypair.publicKey)));
 }
 
-async function importPub(b64) {
-  return crypto.subtle.importKey(
-    "raw", b64ToBuf(b64),
-    { name: "ECDH", namedCurve: "X25519" },
-    true, []
-  );
+async function importX25519Pub(b64) {
+  return crypto.subtle.importKey("raw", b64ToBuf(b64), { name: "ECDH", namedCurve: "X25519" }, true, []);
 }
 
 
 // ════════════════════════════════════════════════════════════════════
-//  3. MESSAGE PADDING — შეტყობინების სიგრძე იმალება
-//  სერვერი ვერ გაიგებს "გრძელი შეტყობინება იყო თუ მოკლე"
+//  ML-KEM-768 (CRYSTALS-Kyber) — Post-Quantum KEM
+//  კვანტური კომპიუტერი ვერ გატეხს
+//  NIST FIPS 203 — 2024 სტანდარტი
 // ════════════════════════════════════════════════════════════════════
 
-const PADDING_BLOCK = 256; // ყოველი შეტყობინება 256-ის ჯერადი ზომისაა
+function mlkemKeyGen() {
+  // crystals-kyber-js: Kyber768.KeyGen() → { publicKey: Uint8Array(1184), privateKey: Uint8Array(2400) }
+  return Kyber768.KeyGen();
+}
+
+function mlkemEncapsulate(theirPublicKey) {
+  // Kyber768.Encrypt(pk) → { cipherText: Uint8Array(1088), sharedSecret: Uint8Array(32) }
+  return Kyber768.Encrypt(theirPublicKey);
+}
+
+function mlkemDecapsulate(myPrivateKey, cipherText) {
+  // Kyber768.Decrypt(sk, ct) → Uint8Array(32)
+  return Kyber768.Decrypt(myPrivateKey, cipherText);
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+//  PQXDH — Hybrid Key Exchange
+//
+//  alice = პირველი შემომსვლელი (mlkem keypair-ს აქვს)
+//  bob   = მეორე შემომსვლელი (encapsulate alice-ის mlkem pub-ზე)
+//
+//  Flow:
+//    alice → server: { x25519_pub, mlkem_pub }
+//    bob   ← server: alice-ის x25519_pub, mlkem_pub
+//    bob   → server: { x25519_pub, mlkem_pub, pqct = KEM.encaps(alice_mlkem_pub).ct }
+//    alice ← server: bob-ის x25519_pub, pqct
+//
+//    bob's SK   = HKDF(x25519_dh(bob_priv, alice_pub)  ‖ mlkem_ss_encaps)
+//    alice's SK = HKDF(x25519_dh(alice_priv, bob_pub)  ‖ mlkem_ss_decaps)
+//    → ორივეს ერთნაირი SK
+// ════════════════════════════════════════════════════════════════════
+
+async function pqxdhCombine(x25519DhOutput, mlkemSharedSecret, argon2SK) {
+  // Combine classical + post-quantum + password KDF
+  const combined = concatBuffers(x25519DhOutput, mlkemSharedSecret, argon2SK);
+  return hkdf(combined, new Uint8Array(32), "enc.chat-pqxdh-v4", 32);
+}
+
+
+// ── Message Padding ───────────────────────────────────────────────
+
+const PADDING_BLOCK = 256;
 
 function padMessage(plainBytes) {
-  // Format: [2-byte original length (LE)] + [plaintext] + [random padding]
   const origLen = plainBytes.length;
-  const totalContent = 2 + origLen;
-  const padded = Math.ceil(totalContent / PADDING_BLOCK) * PADDING_BLOCK;
-  const padLen  = padded - totalContent;
-
-  const out = new Uint8Array(padded);
-  // წინ ვწერთ ორიგინალ სიგრძეს (2 byte, little-endian)
+  const total   = 2 + origLen;
+  const padded  = Math.ceil(total / PADDING_BLOCK) * PADDING_BLOCK;
+  const out     = new Uint8Array(padded);
   out[0] = origLen & 0xFF;
   out[1] = (origLen >> 8) & 0xFF;
   out.set(plainBytes, 2);
-  // random padding
-  if (padLen > 0) {
-    const rnd = crypto.getRandomValues(new Uint8Array(padLen));
-    out.set(rnd, 2 + origLen);
-  }
+  if (padded - total > 0)
+    out.set(crypto.getRandomValues(new Uint8Array(padded - total)), 2 + origLen);
   return out;
 }
 
@@ -230,14 +249,11 @@ function unpadMessage(padded) {
 }
 
 
-// ════════════════════════════════════════════════════════════════════
-//  4. KEY FINGERPRINT — MITM შეუძლებელია
-//  ორივე მხარე ადარებს fingerprint-ს — თუ ემთხვევა, კავშირი სუფთაა
-// ════════════════════════════════════════════════════════════════════
+// ── Key Fingerprint ───────────────────────────────────────────────
 
 async function computeFingerprint(rk) {
-  const raw = await hkdf(rk, new Uint8Array(32), "enc.chat-fingerprint-v3", 6);
-  return bytesToHex(raw); // 12 hex chars — მარტივი შესადარებლად
+  const raw = await hkdf(rk, new Uint8Array(32), "enc.chat-fingerprint-v4", 6);
+  return bytesToHex(raw);
 }
 
 
@@ -259,50 +275,41 @@ function newDRState() {
   };
 }
 
-async function initDR(sk, myKeypair, myPubB64, theirPubB64) {
-  const theirPub = await importPub(theirPubB64);
-  const dhOut    = await dhExchange(myKeypair.privateKey, theirPub);
+async function initDR(sk, myX25519Keypair, myX25519B64, theirX25519B64) {
+  const theirPub = await importX25519Pub(theirX25519B64);
+  const dhOut    = await x25519DH(myX25519Keypair.privateKey, theirPub);
 
-  const init64 = await hkdf(dhOut, sk, "enc.chat-dr-init-v3", 64);
-  const chainA = new Uint8Array(init64.slice(0, 32));
-  const chainB = new Uint8Array(init64.slice(32));
-  const rk     = await hkdf(dhOut, sk, "enc.chat-dr-root-v3", 32);
-
-  const isAlice = myPubB64 < theirPubB64;
+  const init64 = await hkdf(dhOut, sk, "enc.chat-dr-init-v4", 64);
+  const rk     = await hkdf(dhOut, sk, "enc.chat-dr-root-v4", 32);
+  const isAlice = myX25519B64 < theirX25519B64;
 
   dr = newDRState();
-  dr.DHs    = myKeypair;
-  dr.DHsB64 = myPubB64;
+  dr.DHs    = myX25519Keypair;
+  dr.DHsB64 = myX25519B64;
   dr.DHr    = theirPub;
-  dr.DHrB64 = theirPubB64;
+  dr.DHrB64 = theirX25519B64;
   dr.RK     = rk;
-  dr.CKs    = isAlice ? chainA : chainB;
-  dr.CKr    = isAlice ? chainB : chainA;
+  dr.CKs    = isAlice ? new Uint8Array(init64.slice(0, 32)) : new Uint8Array(init64.slice(32));
+  dr.CKr    = isAlice ? new Uint8Array(init64.slice(32))    : new Uint8Array(init64.slice(0, 32));
   dr.ready  = true;
-
-  // Key Fingerprint — ორივე მხარეს ერთნაირი გამოდის
   dr.fingerprint = await computeFingerprint(rk);
 }
 
 async function dhRatchetStep(theirNewPubB64) {
-  dr.PN     = dr.Ns;
-  dr.Ns     = 0;
-  dr.Nr     = 0;
+  dr.PN = dr.Ns; dr.Ns = 0; dr.Nr = 0;
   dr.DHrB64 = theirNewPubB64;
-  dr.DHr    = await importPub(theirNewPubB64);
+  dr.DHr    = await importX25519Pub(theirNewPubB64);
 
-  const dh1 = await dhExchange(dr.DHs.privateKey, dr.DHr);
+  const dh1 = await x25519DH(dr.DHs.privateKey, dr.DHr);
   const [rk1, ckr] = await kdfRK(dr.RK, dh1);
 
-  dr.DHs    = await generateDHKeypair();
-  dr.DHsB64 = await exportPub(dr.DHs);
+  dr.DHs    = await generateX25519();
+  dr.DHsB64 = await exportX25519Pub(dr.DHs);
 
-  const dh2 = await dhExchange(dr.DHs.privateKey, dr.DHr);
+  const dh2 = await x25519DH(dr.DHs.privateKey, dr.DHr);
   const [rk2, cks] = await kdfRK(rk1, dh2);
 
-  dr.RK  = rk2;
-  dr.CKr = ckr;
-  dr.CKs = cks;
+  dr.RK = rk2; dr.CKr = ckr; dr.CKs = cks;
 }
 
 async function skipMessageKeys(until) {
@@ -310,52 +317,37 @@ async function skipMessageKeys(until) {
   while (dr.Nr < until) {
     const [newCKr, mk] = await kdfCK(dr.CKr);
     dr.MKSKIPPED.set(`${dr.DHrB64}:${dr.Nr}`, mk);
-    dr.CKr = newCKr;
-    dr.Nr++;
+    dr.CKr = newCKr; dr.Nr++;
   }
 }
-
-// ── Ratchet Encrypt ───────────────────────────────────────────────
 
 async function ratchetEncrypt(text) {
   const [newCKs, mk] = await kdfCK(dr.CKs);
   dr.CKs = newCKs;
-
   const { aesKey, chachaKey } = await expandMK(mk);
 
-  // Padding — სიგრძე იმალება
-  const plainBytes = new TextEncoder().encode(text);
-  const padded     = padMessage(plainBytes);
-
-  // ChaCha20
+  const padded      = padMessage(new TextEncoder().encode(text));
   const chachaNonce = crypto.getRandomValues(new Uint8Array(12));
   const afterChacha = chacha20Xor(chachaKey, chachaNonce, padded);
-
-  // AES-256-GCM
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, afterChacha);
+  const iv          = crypto.getRandomValues(new Uint8Array(12));
+  const ct          = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, afterChacha);
 
   const packed = new Uint8Array(12 + 12 + ct.byteLength);
-  packed.set(chachaNonce, 0);
-  packed.set(iv, 12);
+  packed.set(chachaNonce, 0); packed.set(iv, 12);
   packed.set(new Uint8Array(ct), 24);
 
   const header = { dh: dr.DHsB64, n: dr.Ns, pn: dr.PN };
   dr.Ns++;
-
   return { enc: bufToB64(packed), header };
 }
 
-// ── Ratchet Decrypt ───────────────────────────────────────────────
-
 async function ratchetDecrypt(encB64, header) {
   try {
-    const skippedKey = `${header.dh}:${header.n}`;
+    const skKey = `${header.dh}:${header.n}`;
     let mk;
-
-    if (dr.MKSKIPPED.has(skippedKey)) {
-      mk = dr.MKSKIPPED.get(skippedKey);
-      dr.MKSKIPPED.delete(skippedKey);
+    if (dr.MKSKIPPED.has(skKey)) {
+      mk = dr.MKSKIPPED.get(skKey);
+      dr.MKSKIPPED.delete(skKey);
     } else {
       if (header.dh !== dr.DHrB64) {
         await skipMessageKeys(header.pn);
@@ -363,9 +355,7 @@ async function ratchetDecrypt(encB64, header) {
       }
       await skipMessageKeys(header.n);
       const [newCKr, msgKey] = await kdfCK(dr.CKr);
-      dr.CKr = newCKr;
-      dr.Nr++;
-      mk = msgKey;
+      dr.CKr = newCKr; dr.Nr++; mk = msgKey;
     }
 
     const { aesKey, chachaKey } = await expandMK(mk);
@@ -373,20 +363,14 @@ async function ratchetDecrypt(encB64, header) {
     const chachaNonce = packed.slice(0, 12);
     const iv          = packed.slice(12, 24);
     const ct          = packed.slice(24);
-
-    const afterAes = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
-    const padded   = new Uint8Array(afterAes);
-    const plain    = chacha20Xor(chachaKey, chachaNonce, padded);
-
-    // Unpad — ორიგინალ სიგრძეს ვიღებთ
+    const afterAes    = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
+    const plain       = chacha20Xor(chachaKey, chachaNonce, new Uint8Array(afterAes));
     return new TextDecoder().decode(unpadMessage(plain));
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 
-// ── Sent Message Cache ────────────────────────────────────────────
+// ── Sent Cache ────────────────────────────────────────────────────
 const sentCache = new Map();
 
 
@@ -395,30 +379,24 @@ const sentCache = new Map();
 function generateCodes() {
   const chars   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const special = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-
-  const randStr = (len, charset) => {
-    const arr = new Uint8Array(len);
-    crypto.getRandomValues(arr);
-    return Array.from(arr).map(b => charset[b % charset.length]).join("");
+  const randStr = (len, cs) => {
+    const a = new Uint8Array(len); crypto.getRandomValues(a);
+    return Array.from(a).map(b => cs[b % cs.length]).join("");
   };
-
   const room = randStr(64, chars);
   const pass = randStr(128, special);
-
   document.getElementById("gen-room").textContent = room;
   document.getElementById("gen-pass").textContent = pass;
   document.getElementById("gen-result").style.display = "block";
   document.getElementById("room-input").value = room;
   document.getElementById("pass-input").value = pass;
-
   document.querySelectorAll(".copy-btn").forEach(btn => {
     btn.onclick = () => {
-      const val = document.getElementById(btn.dataset.target).textContent;
-      navigator.clipboard.writeText(val).then(() => {
-        btn.textContent = "✓";
-        btn.classList.add("copied");
-        setTimeout(() => { btn.textContent = "კოპირება"; btn.classList.remove("copied"); }, 1500);
-      });
+      navigator.clipboard.writeText(document.getElementById(btn.dataset.target).textContent)
+        .then(() => {
+          btn.textContent = "✓"; btn.classList.add("copied");
+          setTimeout(() => { btn.textContent = "კოპირება"; btn.classList.remove("copied"); }, 1500);
+        });
     };
   });
 }
@@ -426,37 +404,40 @@ function generateCodes() {
 
 // ── State ─────────────────────────────────────────────────────────
 
-let currentRoom  = "";
-const SESSION_ID = crypto.randomUUID();
-let pollInterval = null;
-let tickInterval = null;
-let renderedIds  = new Set();
-let _pendingInit = null;
+let currentRoom    = "";
+const SESSION_ID   = crypto.randomUUID();
+let pollInterval   = null;
+let tickInterval   = null;
+let renderedIds    = new Set();
+let _pendingInit   = null;
+// Store our keys for PQXDH
+let _myX25519      = null;
+let _myX25519B64   = null;
+let _myMlkemPriv   = null;
+let _myMlkemPub    = null;
+let _argon2SK      = null;
 
 
-// ── UI Helpers ────────────────────────────────────────────────────
+// ── UI ────────────────────────────────────────────────────────────
 
 function showJoinStatus(msg) {
   const el = document.getElementById("join-status");
   if (!el) return;
-  el.textContent   = msg;
-  el.style.display = msg ? "block" : "none";
+  el.textContent = msg; el.style.display = msg ? "block" : "none";
 }
 
 function updateDRStatus() {
   const el = document.getElementById("dr-status");
   const fp = document.getElementById("fingerprint");
   if (!el) return;
-
   if (dr && dr.ready) {
-    el.textContent = "🔐 Double Ratchet: აქტიური";
+    el.textContent = "🔐 PQXDH + Double Ratchet: აქტიური";
     el.className   = "dr-status dr-ready";
     if (fp && dr.fingerprint) {
-      // Format: ABC1 2345 6DEF
       const f = dr.fingerprint;
-      fp.textContent = `🔑 ${f.slice(0,4)} ${f.slice(4,8)} ${f.slice(8,12)}`;
+      fp.textContent   = `🔑 ${f.slice(0,4)} ${f.slice(4,8)} ${f.slice(8,12)}`;
       fp.style.display = "block";
-      fp.title = "შეადარე მეგობარს — თუ ემთხვევა, კავშირი 100% სუფთაა (MITM შეუძლებელია)";
+      fp.title = "შეადარე მეგობარს — MITM შეუძლებელია";
     }
   } else {
     el.textContent = "⏳ მეორე მომხმარებელს ელოდება...";
@@ -466,16 +447,56 @@ function updateDRStatus() {
 }
 
 
-// ── DR Init ───────────────────────────────────────────────────────
+// ── PQXDH Init ───────────────────────────────────────────────────
 
-async function tryInitDR(room, sk, myKeypair, myPubB64) {
+async function tryInitPQXDH() {
   try {
-    const res  = await fetch(`/api/keys?room=${encodeURIComponent(room)}&sid=${SESSION_ID}`);
+    const res  = await fetch(`/api/keys?room=${encodeURIComponent(currentRoom)}&sid=${SESSION_ID}`);
     const data = await res.json();
     if (!data.keys || data.keys.length === 0) return false;
-    await initDR(sk, myKeypair, myPubB64, data.keys[0].pub);
+
+    const them = data.keys[0];
+
+    // X25519 DH
+    const theirX25519 = await importX25519Pub(them.pub);
+    const dhOut       = await x25519DH(_myX25519.privateKey, theirX25519);
+
+    let mlkemSS;
+
+    if (them.pqct) {
+      // They already encapsulated to our ML-KEM pub — we decapsulate
+      mlkemSS = mlkemDecapsulate(_myMlkemPriv, b64ToBuf(them.pqct));
+    } else {
+      // We encapsulate to their ML-KEM pub — they will decapsulate
+      showJoinStatus("🔮 ML-KEM-768...");
+      const { cipherText, sharedSecret } = mlkemEncapsulate(b64ToBuf(them.mlkemPub));
+      mlkemSS = sharedSecret;
+
+      // Upload our pqct so they can decapsulate
+      await fetch("/api/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room:      currentRoom,
+          sid:       SESSION_ID,
+          pub:       _myX25519B64,
+          mlkemPub:  bufToB64(_myMlkemPub),
+          pqct:      bufToB64(cipherText)
+        })
+      });
+      showJoinStatus("");
+    }
+
+    // PQXDH: combine X25519 + ML-KEM + Argon2id
+    const sk = await pqxdhCombine(dhOut, mlkemSS, _argon2SK);
+
+    // Init Double Ratchet with combined SK
+    await initDR(sk, _myX25519, _myX25519B64, them.pub);
     return true;
-  } catch { return false; }
+  } catch (e) {
+    console.error("PQXDH init error:", e);
+    return false;
+  }
 }
 
 
@@ -484,36 +505,47 @@ async function tryInitDR(room, sk, myKeypair, myPubB64) {
 async function joinRoom() {
   const room = document.getElementById("room-input").value.trim();
   const pass = document.getElementById("pass-input").value;
-
-  if (!room || !pass) { showError("ოთახის კოდი და პაროლი საჭიროა."); return; }
+  if (!room || !pass)          { showError("ოთახის კოდი და პაროლი საჭიროა."); return; }
   if (room.length > 128 || pass.length > 256) { showError("ძალიან გრძელი."); return; }
 
-  document.getElementById("join-btn").disabled = true;
+  document.getElementById("join-btn").disabled    = true;
   document.getElementById("join-btn").textContent = "[ იტვირთება... ]";
 
   try {
-    // 1. Argon2id → SK
-    const sk = await deriveSK_Argon2id(pass, room);
+    // 1. Argon2id → SK (additional layer)
+    _argon2SK = await deriveSK_Argon2id(pass, room);
 
     // 2. X25519 keypair
-    const myKeypair = await generateDHKeypair();
-    const myPubB64  = await exportPub(myKeypair);
+    showJoinStatus("🔑 გასაღებები...");
+    _myX25519    = await generateX25519();
+    _myX25519B64 = await exportX25519Pub(_myX25519);
 
-    // 3. Register pub key
+    // 3. ML-KEM-768 keypair
+    showJoinStatus("🔮 ML-KEM-768 გასაღებები...");
+    const mlkemKeys = mlkemKeyGen();
+    _myMlkemPriv = mlkemKeys.privateKey;
+    _myMlkemPub  = mlkemKeys.publicKey;
+    showJoinStatus("");
+
+    // 4. Register both public keys
     await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room, sid: SESSION_ID, pub: myPubB64 })
+      body: JSON.stringify({
+        room,
+        sid:      SESSION_ID,
+        pub:      _myX25519B64,
+        mlkemPub: bufToB64(_myMlkemPub)
+      })
     });
 
     currentRoom = room;
     dr = null;
 
-    // 4. Try DR init
-    const ready = await tryInitDR(room, sk, myKeypair, myPubB64);
-    if (!ready) _pendingInit = { sk, myKeypair, myPubB64 };
+    // 5. Try PQXDH init
+    const ready = await tryInitPQXDH();
+    if (!ready) _pendingInit = true;
 
-    // 5. Show chat
     document.getElementById("header-room").textContent = room;
     document.getElementById("join-screen").style.display = "none";
     document.getElementById("chat-screen").style.display = "flex";
@@ -529,16 +561,15 @@ async function joinRoom() {
     showError("შეცდომა. სცადეთ თავიდან.");
     console.error(e);
   } finally {
-    document.getElementById("join-btn").disabled = false;
+    document.getElementById("join-btn").disabled    = false;
     document.getElementById("join-btn").textContent = "შესვლა";
   }
 }
 
 async function poll() {
   if (_pendingInit && (!dr || !dr.ready)) {
-    const { sk, myKeypair, myPubB64 } = _pendingInit;
-    const ready = await tryInitDR(currentRoom, sk, myKeypair, myPubB64);
-    if (ready) { _pendingInit = null; updateDRStatus(); }
+    const ready = await tryInitPQXDH();
+    if (ready) { _pendingInit = false; updateDRStatus(); }
   }
   await fetchAndRender();
 }
@@ -546,22 +577,20 @@ async function poll() {
 function leaveRoom() {
   clearInterval(pollInterval);
   clearInterval(tickInterval);
-  currentRoom  = "";
-  dr           = null;
-  _pendingInit = null;
-  renderedIds.clear();
-  sentCache.clear();
-  document.getElementById("messages").innerHTML  = "";
-  document.getElementById("chat-screen").style.display  = "none";
-  document.getElementById("join-screen").style.display  = "flex";
-  document.getElementById("pass-input").value = "";
-  document.getElementById("join-error").style.display = "none";
+  currentRoom = ""; dr = null; _pendingInit = null;
+  _myX25519 = null; _myX25519B64 = null;
+  _myMlkemPriv = null; _myMlkemPub = null; _argon2SK = null;
+  renderedIds.clear(); sentCache.clear();
+  document.getElementById("messages").innerHTML        = "";
+  document.getElementById("chat-screen").style.display = "none";
+  document.getElementById("join-screen").style.display = "flex";
+  document.getElementById("pass-input").value          = "";
+  document.getElementById("join-error").style.display  = "none";
 }
 
 function showError(msg) {
   const el = document.getElementById("join-error");
-  el.textContent   = msg;
-  el.style.display = "block";
+  el.textContent = msg; el.style.display = "block";
 }
 
 
@@ -571,53 +600,37 @@ async function sendMessage() {
   const input = document.getElementById("msg-input");
   const text  = input.value.trim();
   if (!text) return;
-
-  if (!dr || !dr.ready) {
-    showChatNotice("⏳ მეორე მომხმარებელი ჯერ არ შემოუერთდა.");
-    return;
-  }
+  if (!dr || !dr.ready) { showChatNotice("⏳ მეორე მომხმარებელი ჯერ არ შემოუერთდა."); return; }
 
   const ttl = parseInt(document.getElementById("ttl-select").value);
-
   try {
     const { enc, header } = await ratchetEncrypt(text);
-
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        room: currentRoom, enc,
-        sid: SESSION_ID,
-        dhPub: header.dh, msgN: header.n, prevN: header.pn,
-        ttl
+        room: currentRoom, enc, sid: SESSION_ID,
+        dhPub: header.dh, msgN: header.n, prevN: header.pn, ttl
       })
     });
-
     if (!res.ok) throw new Error("send failed");
     const data = await res.json();
     if (data.id) sentCache.set(data.id, text);
-
-    input.value = "";
-    input.style.height = "auto";
+    input.value = ""; input.style.height = "auto";
     await fetchAndRender();
   } catch (e) { console.error(e); }
 }
 
 function showChatNotice(msg) {
-  const container = document.getElementById("messages");
+  const c  = document.getElementById("messages");
   const el = document.createElement("div");
-  el.className   = "sys-msg";
-  el.textContent = msg;
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
+  el.className = "sys-msg"; el.textContent = msg;
+  c.appendChild(el); c.scrollTop = c.scrollHeight;
   setTimeout(() => el.remove(), 4000);
 }
 
 function handleKey(e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 }
 
 function autoResize(el) {
@@ -641,20 +654,14 @@ async function renderMessages(records) {
   const serverIds = new Set(records.map(r => r.id));
 
   document.querySelectorAll(".msg[data-id]").forEach(el => {
-    if (!serverIds.has(el.dataset.id)) {
-      el.remove();
-      renderedIds.delete(el.dataset.id);
-    }
+    if (!serverIds.has(el.dataset.id)) { el.remove(); renderedIds.delete(el.dataset.id); }
   });
 
   let scrollNeeded = false;
-
   for (const rec of records) {
     if (renderedIds.has(rec.id)) continue;
-
     const mine = rec.sid === SESSION_ID;
     let text;
-
     if (mine) {
       text = sentCache.get(rec.id) || "[ გაგზავნილი ]";
     } else {
@@ -663,29 +670,24 @@ async function renderMessages(records) {
       if (text === null) continue;
     }
 
-    const div    = document.createElement("div");
-    div.className  = `msg ${mine ? "mine" : "theirs"}`;
+    const div = document.createElement("div");
+    div.className = `msg ${mine ? "mine" : "theirs"}`;
     div.dataset.id = rec.id;
 
-    const bubble       = document.createElement("div");
-    bubble.className   = "bubble";
-    bubble.textContent = text;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble"; bubble.textContent = text;
 
     const meta  = document.createElement("div");
-    meta.className = "meta";
+    meta.className  = "meta";
     const span  = document.createElement("span");
-    span.className       = "timer";
-    span.dataset.expires = rec.expires;
-    span.textContent     = formatTime(Math.max(0, Math.floor((rec.expires - Date.now()) / 1000)));
+    span.className  = "timer"; span.dataset.expires = rec.expires;
+    span.textContent = formatTime(Math.max(0, Math.floor((rec.expires - Date.now()) / 1000)));
     meta.appendChild(span);
 
-    div.appendChild(bubble);
-    div.appendChild(meta);
+    div.appendChild(bubble); div.appendChild(meta);
     container.appendChild(div);
-    renderedIds.add(rec.id);
-    scrollNeeded = true;
+    renderedIds.add(rec.id); scrollNeeded = true;
   }
-
   if (scrollNeeded) container.scrollTop = container.scrollHeight;
 }
 
@@ -695,8 +697,7 @@ async function renderMessages(records) {
 function tickTimers() {
   const now = Date.now();
   document.querySelectorAll(".timer").forEach(el => {
-    const left = Math.max(0, Math.floor((parseInt(el.dataset.expires) - now) / 1000));
-    el.textContent = formatTime(left);
+    el.textContent = formatTime(Math.max(0, Math.floor((parseInt(el.dataset.expires) - now) / 1000)));
   });
 }
 
@@ -714,15 +715,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("join-btn").addEventListener("click", joinRoom);
   document.getElementById("leave-btn").addEventListener("click", leaveRoom);
   document.getElementById("send-btn").addEventListener("click", sendMessage);
-
-  const msgInput = document.getElementById("msg-input");
-  msgInput.addEventListener("keydown", handleKey);
-  msgInput.addEventListener("input", function() { autoResize(this); });
-
-  document.getElementById("pass-input").addEventListener("keydown", e => {
-    if (e.key === "Enter") joinRoom();
-  });
-  document.getElementById("room-input").addEventListener("keydown", e => {
-    if (e.key === "Enter") document.getElementById("pass-input").focus();
-  });
+  const mi = document.getElementById("msg-input");
+  mi.addEventListener("keydown", handleKey);
+  mi.addEventListener("input", function() { autoResize(this); });
+  document.getElementById("pass-input").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
+  document.getElementById("room-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("pass-input").focus(); });
 });

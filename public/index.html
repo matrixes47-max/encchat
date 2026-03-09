@@ -467,7 +467,7 @@
 <!-- JOIN -->
 <div id="join-screen">
   <div id="join-title">დაშიფრული ჩათი</div>
-  <div id="join-subtitle">enc.chat — Argon2id · X25519 · Double Ratchet · AES-256-GCM · ChaCha20</div>
+  <div id="join-subtitle">enc.chat — PQXDH · ML-KEM-768 · X25519 · Argon2id · Double Ratchet · AES-256-GCM</div>
 
   <label>ოთახის კოდი</label>
   <div class="input-row">
@@ -502,9 +502,9 @@
   <div id="join-status" style="display:none; color:#888; font-size:11px; margin-top:10px; letter-spacing:1px;"></div>
 
   <div id="join-info">
-    — Argon2id: brute force შეუძლებელია (64MB memory)<br>
-    — X25519 + Double Ratchet + ChaCha20 + AES-256-GCM<br>
-    — Message Padding: სიგრძეც კი არ ჩანს<br>
+    — ML-KEM-768: კვანტური კომპიუტერი ვერ გატეხს<br>
+    — X25519 + PQXDH + Argon2id + Double Ratchet<br>
+    — ChaCha20 + AES-256-GCM + Message Padding<br>
     — პაროლი სერვერს არ ეგზავნება · IP არ ინახება<br>
     — შეტყობინება თვითგანადგურდება
   </div>
@@ -531,9 +531,10 @@
     <button id="send-btn">[ გაგზავნა ]</button>
   </div>
 
-  <div id="status-bar">argon2id · x25519 · double ratchet · aes-256-gcm + chacha20 · padding · no logs · no ip</div>
+  <div id="status-bar">ml-kem-768 · x25519 · pqxdh · argon2id · double ratchet · aes-256-gcm · chacha20 · no ip</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/crystals-kyber-js@1.0.0/kyber.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2.min.js"></script>
 <script src="/app.js"></script>
 </body>
