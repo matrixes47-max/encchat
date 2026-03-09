@@ -201,49 +201,31 @@ app.use(express.json({ limit: CONFIG.MAX_REQUEST_SIZE }));
 app.get("/kyber.min.js", async (req, res) => {
   try {
     const lib = await import("crystals-kyber-js");
+    const KyberClass = lib.Kyber768;
+    if (typeof KyberClass !== "function") throw new Error("Kyber768 class not found");
 
-    // ლოგი — ვნახოთ რა structure აქვს
-    const keys = Object.keys(lib);
-    console.log("kyber lib keys:", keys);
-    for (const k of keys) {
-      const v = lib[k];
-      if (v && typeof v === "object") {
-        console.log("kyber", k, "methods:", Object.getOwnPropertyNames(v).slice(0,10));
-      } else if (typeof v === "function") {
-        console.log("kyber", k, "is function");
-      }
-    }
+    // instance-ს ვქმნით — class-ია, არა static object
+    const K = new KyberClass();
 
-    // მოძებნე Kyber768 ობიექტი — ყველა შესაძლო სახელით
-    const K = lib.Kyber768 || lib.kyber768 || lib.Kyber768KEM ||
-              lib.default?.Kyber768 || lib.default?.kyber768 ||
-              lib.default || lib;
-
-    console.log("K type:", typeof K, "K keys:", K ? Object.getOwnPropertyNames(K).slice(0,15) : "null");
-
-    // მოძებნე მეთოდები — სხვადასხვა სახელებით
-    const keyGen  = K.KeyGen   || K.keyGen   || K.generateKey || K.keypair || K.keygen;
-    const encrypt = K.Encrypt  || K.encrypt  || K.encapsulate || K.enc;
-    const decrypt = K.Decrypt  || K.decrypt  || K.decapsulate || K.dec;
-
-    console.log("keyGen:", typeof keyGen, "encrypt:", typeof encrypt, "decrypt:", typeof decrypt);
-
-    if (typeof keyGen !== "function") throw new Error("KeyGen not found. Keys: " + Object.getOwnPropertyNames(K).join(","));
-
-    // test
-    const testKeys = keyGen();
-    console.log("test keyGen result keys:", testKeys ? Object.keys(testKeys) : "null");
+    // instance მეთოდების სახელები
+    const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(K));
+    console.log("Kyber768 instance methods:", proto);
 
     const browser = `!function(){
-var _kg=${keyGen.toString()};
-var _enc=${encrypt.toString()};
-var _dec=${decrypt.toString()};
-window.Kyber768={
-  KeyGen: function(){ return _kg.apply(this,arguments); },
-  Encrypt: function(pk){ return _enc.apply(this,[pk]); },
-  Decrypt: function(sk,ct){ return _dec.apply(this,[sk,ct]); }
-};
-console.log("Kyber768 loaded OK");
+var _lib=(function(){
+var module={exports:{}};
+// Kyber768 class-ს ვქმნით და window-ში ვდებთ
+window._KyberClass=${KyberClass.toString()};
+try {
+  var inst = new window._KyberClass();
+  window.Kyber768 = {
+    KeyGen: function(){ return inst.generateKeyPair ? inst.generateKeyPair() : inst.keyGen ? inst.keyGen() : inst.keygen(); },
+    Encrypt: function(pk){ return inst.encapsulate ? inst.encapsulate(pk) : inst.encrypt(pk); },
+    Decrypt: function(sk,ct){ return inst.decapsulate ? inst.decapsulate(sk,ct) : inst.decrypt(sk,ct); }
+  };
+  console.log("Kyber768 loaded, methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(inst)));
+} catch(e){ console.error("Kyber768 init error:",e); }
+})();
 }();`;
 
     res.setHeader("Content-Type", "application/javascript");
