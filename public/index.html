@@ -467,7 +467,7 @@
 <!-- JOIN -->
 <div id="join-screen">
   <div id="join-title">დაშიფრული ჩათი</div>
-  <div id="join-subtitle">enc.chat — ანონიმური · Zero-Knowledge · Double Ratchet · AES-256-GCM</div>
+  <div id="join-subtitle">enc.chat — Argon2id · X25519 · Double Ratchet · AES-256-GCM · ChaCha20</div>
 
   <label>ოთახის კოდი</label>
   <div class="input-row">
@@ -499,10 +499,12 @@
   <button id="join-btn">შესვლა</button>
 
   <div id="join-error"></div>
+  <div id="join-status" style="display:none; color:#888; font-size:11px; margin-top:10px; letter-spacing:1px;"></div>
 
   <div id="join-info">
-    — Double Ratchet: ყოველ შეტყობინებას უნიკალური გასაღები<br>
-    — P-256 ECDH + ChaCha20 + AES-256-GCM<br>
+    — Argon2id: brute force შეუძლებელია (64MB memory)<br>
+    — X25519 + Double Ratchet + ChaCha20 + AES-256-GCM<br>
+    — Message Padding: სიგრძეც კი არ ჩანს<br>
     — პაროლი სერვერს არ ეგზავნება · IP არ ინახება<br>
     — შეტყობინება თვითგანადგურდება
   </div>
@@ -512,7 +514,7 @@
 <div id="chat-screen">
   <div id="chat-header">
     <span id="header-room"></span>
-    <span id="dr-status" class="dr-status dr-waiting">⏳ მეორე მომხმარებელს ელოდება...</span>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span id="dr-status" class="dr-status dr-waiting">⏳ მეორე მომხმარებელს ელოდება...</span><span id="fingerprint" style="display:none;font-size:9px;color:#004400;letter-spacing:2px;cursor:help;"></span></div>
     <button id="leave-btn">გასვლა</button>
   </div>
 
@@ -529,9 +531,10 @@
     <button id="send-btn">[ გაგზავნა ]</button>
   </div>
 
-  <div id="status-bar">double ratchet · zero-knowledge · aes-256-gcm + chacha20 · no logs · no ip</div>
+  <div id="status-bar">argon2id · x25519 · double ratchet · aes-256-gcm + chacha20 · padding · no logs · no ip</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2.min.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>
