@@ -1,1 +1,93 @@
+# enc.chat systemd service unit
+# Installation:
+#   1. Copy to /etc/systemd/system/encchat.service
+#   2. Edit paths and user
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable encchat
+#   5. sudo systemctl start encchat
 
+[Unit]
+Description=enc.chat v4.1 - Post-Quantum Encrypted Chat
+Documentation=https://github.com/matrixes47-max/encchat
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=encchat
+Group=encchat
+
+# Paths (adjust these)
+WorkingDirectory=/opt/encchat
+ExecStart=/usr/bin/node server.js
+
+# Environment
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=-/opt/encchat/.env
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/encchat
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallArchitectures=native
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=100%
+TasksMax=100
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+StartLimitInterval=60s
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=encchat
+
+[Install]
+WantedBy=multi-user.target
+
+# ══════════════════════════════════════════════════════════════════
+# Setup Instructions:
+# ══════════════════════════════════════════════════════════════════
+#
+# 1. Create user and directories:
+#    sudo useradd -r -s /bin/false encchat
+#    sudo mkdir -p /opt/encchat
+#    sudo chown -R encchat:encchat /opt/encchat
+#
+# 2. Install application:
+#    sudo cp -r server.js public package*.json /opt/encchat/
+#    cd /opt/encchat && sudo -u encchat npm ci --only=production
+#
+# 3. Configure environment:
+#    sudo cp .env.example /opt/encchat/.env
+#    sudo nano /opt/encchat/.env  # Edit as needed
+#
+# 4. Install and enable service:
+#    sudo cp encchat.service /etc/systemd/system/
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable encchat
+#    sudo systemctl start encchat
+#
+# 5. Verify:
+#    sudo systemctl status encchat
+#    sudo journalctl -u encchat -f
+#
+# ══════════════════════════════════════════════════════════════════
