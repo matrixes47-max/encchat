@@ -224,6 +224,68 @@
     text-align: center; color: #222; font-size: 11px;
     letter-spacing: 1px; align-self: center; padding: 4px 0;
   }
+
+  .input-row { width: 100%; }
+
+  #gen-area { margin-top: 24px; width: 100%; }
+
+  #gen-btn {
+    background: none;
+    border: 1px solid #333;
+    color: #555;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 7px 16px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  #gen-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+  #gen-result {
+    margin-top: 16px;
+    border: 1px solid #1a1a1a;
+    padding: 14px;
+    width: 100%;
+  }
+
+  .gen-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .gen-label { color: #444; font-size: 11px; letter-spacing: 1px; min-width: 56px; }
+
+  .gen-val {
+    color: #cc0000;
+    font-size: 12px;
+    letter-spacing: 1px;
+    word-break: break-all;
+    flex: 1;
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid #222;
+    color: #444;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  .copy-btn:hover { border-color: #cc0000; color: #cc0000; }
+  .copy-btn.copied { color: #008800; border-color: #008800; }
+
+  #gen-hint {
+    color: #333;
+    font-size: 10px;
+    letter-spacing: 1px;
+    margin-top: 8px;
+  }
 </style>
 </head>
 <body>
@@ -234,10 +296,31 @@
   <div id="join-subtitle">enc.chat — ანონიმური · Zero-Knowledge · AES-256-GCM</div>
 
   <label>ოთახის კოდი</label>
-  <input type="text" id="room-input" placeholder="ნებისმიერი კოდი" autocomplete="off" spellcheck="false">
+  <div class="input-row">
+    <input type="text" id="room-input" placeholder="ნებისმიერი კოდი" autocomplete="off" spellcheck="false">
+  </div>
 
   <label>პაროლი</label>
-  <input type="password" id="pass-input" placeholder="საიდუმლო პაროლი" autocomplete="off">
+  <div class="input-row">
+    <input type="password" id="pass-input" placeholder="საიდუმლო პაროლი" autocomplete="off">
+  </div>
+
+  <div id="gen-area">
+    <button id="gen-btn">[ კოდების გენერირება ]</button>
+    <div id="gen-result" style="display:none">
+      <div class="gen-line">
+        <span class="gen-label">კოდი:</span>
+        <span id="gen-room" class="gen-val"></span>
+        <button class="copy-btn" data-target="gen-room">კოპირება</button>
+      </div>
+      <div class="gen-line">
+        <span class="gen-label">პაროლი:</span>
+        <span id="gen-pass" class="gen-val"></span>
+        <button class="copy-btn" data-target="gen-pass">კოპირება</button>
+      </div>
+      <div id="gen-hint">გაუზიარე მეგობარს და შეიყვანე ზემოთ</div>
+    </div>
+  </div>
 
   <button onclick="joinRoom()">შესვლა</button>
 
