@@ -25,20 +25,15 @@ const path    = require("path");
 const fs      = require("fs");
 
 
-// ── Library Setup (argon2 ბრაუზერისთვის) ─────────────────────────
+// ── Library Setup ─────────────────────────────────────────────
+// argon2-bundled.min.js and kyber.min.js are generated at build time
+// by build-kyber.js (via postinstall). Nothing to copy at runtime.
 function setupLibraries() {
   const pub = path.join(__dirname, "public");
-  try {
-    const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
-    const argonJs = path.join(wasmDir, "argon2.min.js");
-    if (fs.existsSync(argonJs) && !fs.existsSync(path.join(pub, "argon2.min.js"))) {
-      fs.copyFileSync(argonJs, path.join(pub, "argon2.min.js"));
-      for (const f of fs.readdirSync(wasmDir)) {
-        if (f.endsWith(".wasm")) fs.copyFileSync(path.join(wasmDir, f), path.join(pub, f));
-      }
-      console.log("✅ argon2 დაკოპირდა");
-    }
-  } catch(e) { console.error("❌ argon2:", e.message); }
+  const kyber  = path.join(pub, "kyber.min.js");
+  const argon2 = path.join(pub, "argon2-bundled.min.js");
+  if (!require("fs").existsSync(kyber))  console.warn("⚠️  kyber.min.js not found in public/");
+  if (!require("fs").existsSync(argon2)) console.warn("⚠️  argon2-bundled.min.js not found in public/");
 }
 setupLibraries();
 
@@ -169,6 +164,7 @@ app.use((req, res, next) => {
       "img-src 'self' data:",
       "font-src 'self'",
       "connect-src 'self'",
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'none'",

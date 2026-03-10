@@ -6,45 +6,44 @@ async function main() {
   const pubDir = path.join(__dirname, "public");
   if (!fs.existsSync(pubDir)) fs.mkdirSync(pubDir, { recursive: true });
 
-  // ── argon2 ────────────────────────────────────────────────────
-  // index.html loads: /argon2-bundled.min.js
-  // argon2-browser@1.18.0 dist may or may not have the bundled version.
-  // Strategy: prefer argon2-bundled.min.js; fallback — copy argon2.min.js
-  // as argon2-bundled.min.js (won't work alone) OR copy all + rename.
-  try {
-    const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
-    if (!fs.existsSync(wasmDir)) throw new Error("argon2-browser/dist not found");
+  // ── argon2 via hash-wasm ──────────────────────────────────────
+  // hash-wasm: No Worker, no blob URL, WASM inline, CSP-friendly.
+  // argon2-browser used a blob Worker which was blocked by strict CSP.
+  // hash-wasm runs in the main thread — works everywhere.
+  //
+  // Exposes window.argon2 with same API app.js expects:
+  //   argon2.hash({ pass, salt, type, mem, time, parallelism, hashLen })
+  //   → { hash: Uint8Array }
+  {
+    const argonEntry = path.join(__dirname, "_argon2_entry.mjs");
+    fs.writeFileSync(argonEntry, `
+import { argon2id } from "hash-wasm";
 
-    const distFiles = fs.readdirSync(wasmDir);
-    console.log("argon2-browser dist files:", distFiles.join(", "));
-
-    const bundledSrc = path.join(wasmDir, "argon2-bundled.min.js");
-    if (fs.existsSync(bundledSrc)) {
-      // ✅ bundled version exists — copy it directly (WASM inlined, no fetch needed)
-      fs.copyFileSync(bundledSrc, path.join(pubDir, "argon2-bundled.min.js"));
-      console.log("✅ argon2-bundled.min.js copied (bundled/WASM-inlined)");
-    } else {
-      // Fallback: package has argon2.min.js + argon2.wasm separately
-      // Copy argon2.wasm to public/ so the script can fetch it
-      // Copy argon2.min.js as argon2-bundled.min.js (it will fetch argon2.wasm from same path)
-      const minSrc  = path.join(wasmDir, "argon2.min.js");
-      const wasmSrc = path.join(wasmDir, "argon2.wasm");
-      if (fs.existsSync(minSrc)) {
-        fs.copyFileSync(minSrc, path.join(pubDir, "argon2-bundled.min.js"));
-        console.log("✅ argon2.min.js → argon2-bundled.min.js copied (fallback)");
-      }
-      if (fs.existsSync(wasmSrc)) {
-        fs.copyFileSync(wasmSrc, path.join(pubDir, "argon2.wasm"));
-        console.log("✅ argon2.wasm copied");
-      }
-      // Also copy any other .js/.wasm just in case
-      for (const f of distFiles) {
-        if ((f.endsWith(".js") || f.endsWith(".wasm")) && f !== "argon2.min.js" && f !== "argon2.wasm") {
-          fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
-        }
-      }
-    }
-  } catch(e) { console.error("❌ argon2:", e.message); }
+window.argon2 = {
+  ArgonType: { Argon2d: 0, Argon2i: 1, Argon2id: 2 },
+  hash: async ({ pass, salt, type, mem, time, parallelism, hashLen }) => {
+    const hash = await argon2id({
+      password: pass,
+      salt: salt,
+      iterations: time       || 3,
+      memorySize: mem        || 65536,
+      hashLength: hashLen    || 32,
+      parallelism: parallelism || 1,
+      outputType: "binary"
+    });
+    return { hash };
+  }
+};
+console.log("[argon2] hash-wasm ready — no Worker, CSP-safe");
+`);
+    const argonOut = path.join(pubDir, "argon2-bundled.min.js");
+    execSync(
+      `./node_modules/.bin/esbuild ${argonEntry} --bundle --minify --format=iife --outfile=${argonOut}`,
+      { stdio: "inherit" }
+    );
+    fs.unlinkSync(argonEntry);
+    console.log(`✅ argon2-bundled.min.js via hash-wasm (${(fs.statSync(argonOut).size/1024).toFixed(1)}KB)`);
+  }
 
   // ── kyber: detect API ─────────────────────────────────────────
   const lib = await import("crystals-kyber-js");
