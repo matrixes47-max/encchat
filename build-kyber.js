@@ -36,7 +36,7 @@ window.argon2 = {
 };
 console.log("[argon2] hash-wasm ready — no Worker, CSP-safe");
 `);
-    const argonOut = path.join(pubDir, "argon2-bundled.min.js");
+    const argonOut = path.join(pubDir, "argon2.min.js");
     execSync(
       `./node_modules/.bin/esbuild ${argonEntry} --bundle --minify --format=iife --loader:.wasm=binary --outfile=${argonOut}`,
       { stdio: "inherit" }

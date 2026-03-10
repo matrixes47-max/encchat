@@ -26,14 +26,14 @@ const fs      = require("fs");
 
 
 // ── Library Setup ─────────────────────────────────────────────
-// argon2-bundled.min.js and kyber.min.js are generated at build time
+// argon2.min.js and kyber.min.js are generated at build time
 // by build-kyber.js (via postinstall). Nothing to copy at runtime.
 function setupLibraries() {
   const pub = path.join(__dirname, "public");
   const kyber  = path.join(pub, "kyber.min.js");
-  const argon2 = path.join(pub, "argon2-bundled.min.js");
+  const argon2 = path.join(pub, "argon2.min.js");
   if (!require("fs").existsSync(kyber))  console.warn("⚠️  kyber.min.js not found in public/");
-  if (!require("fs").existsSync(argon2)) console.warn("⚠️  argon2-bundled.min.js not found in public/");
+  if (!require("fs").existsSync(argon2)) console.warn("⚠️  argon2.min.js not found in public/");
 }
 setupLibraries();
 
