@@ -1,19 +1,19 @@
 # enc.chat v4.2 - Docker build
-FROM node:20-alpine AS base
-
-# Production build
-FROM base AS production
+FROM node:20-alpine
 WORKDIR /app
 
+# პირველ dependency-ები
 COPY package*.json ./
 COPY build-kyber.js ./
-
-# ყველა dependency + postinstall (kyber.min.js + argon2 ავტომატურად შეიქმნება)
-RUN npm install && \
+RUN npm install --ignore-scripts && \
     npm cache clean --force
 
+# შემდეგ source ფაილები
 COPY server.js ./
 COPY public ./public/
+
+# ახლა ვაწყობთ kyber + argon2 — public/ უკვე ადგილზეა
+RUN node build-kyber.js
 
 RUN addgroup -g 1001 -S encchat && \
     adduser -S encchat -u 1001 && \
