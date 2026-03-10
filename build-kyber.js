@@ -6,16 +6,24 @@ async function main() {
   const pubDir = path.join(__dirname, "public");
   if (!fs.existsSync(pubDir)) fs.mkdirSync(pubDir, { recursive: true });
 
-  // ── argon2 ─────────────────────────────────────────────────────
+  // ── argon2 (bundled — WASM inline, no separate fetch/Worker needed) ──
   try {
     const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
     if (fs.existsSync(wasmDir)) {
-      for (const f of fs.readdirSync(wasmDir)) {
-        if (f.endsWith(".js") || f.endsWith(".wasm")) {
-          fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
+      // Prefer bundled version: no external WASM fetch, no Worker blob URL, CSP-friendly
+      const bundled = path.join(wasmDir, "argon2-bundled.min.js");
+      if (fs.existsSync(bundled)) {
+        fs.copyFileSync(bundled, path.join(pubDir, "argon2-bundled.min.js"));
+        console.log("✅ argon2-bundled.min.js copied");
+      } else {
+        // Fallback: copy everything and hope for the best
+        for (const f of fs.readdirSync(wasmDir)) {
+          if (f.endsWith(".js") || f.endsWith(".wasm")) {
+            fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
+          }
         }
+        console.log("✅ argon2 files copied (fallback)");
       }
-      console.log("✅ argon2 copied");
     }
   } catch(e) { console.error("❌ argon2:", e.message); }
 
