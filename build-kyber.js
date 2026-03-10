@@ -1,6 +1,3 @@
-/**
- * build-kyber.js — kyber.min.js + argon2 builder
- */
 const { execSync } = require("child_process");
 const fs   = require("fs");
 const path = require("path");
@@ -9,100 +6,79 @@ async function main() {
   const pubDir = path.join(__dirname, "public");
   if (!fs.existsSync(pubDir)) fs.mkdirSync(pubDir, { recursive: true });
 
-  // ── 1. argon2 copy ─────────────────────────────────────────────
+  // ── argon2 ─────────────────────────────────────────────────────
   try {
     const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
-    const argonJs  = path.join(wasmDir, "argon2.min.js");
-    if (fs.existsSync(argonJs)) {
-      fs.copyFileSync(argonJs, path.join(pubDir, "argon2.min.js"));
+    if (fs.existsSync(wasmDir)) {
       for (const f of fs.readdirSync(wasmDir)) {
-        if (f.endsWith(".wasm")) fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
+        if (f.endsWith(".js") || f.endsWith(".wasm")) {
+          fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
+        }
       }
-      console.log("✅ argon2.min.js copied");
+      console.log("✅ argon2 copied");
     }
   } catch(e) { console.error("❌ argon2:", e.message); }
 
-  // ── 2. kyber API detection ─────────────────────────────────────
+  // ── kyber: ყველა method name ვცდით ─────────────────────────────
   const lib = await import("crystals-kyber-js");
   const inst = new lib.Kyber768();
 
-  // მეთოდები შეიძლება instance-ის own properties იყოს (არა prototype-ზე)
-  const ownProps  = Object.getOwnPropertyNames(inst).filter(m => typeof inst[m] === "function" && m !== "constructor");
-  let protoProps = [];
-  let proto = Object.getPrototypeOf(inst);
-  while (proto && proto !== Object.prototype) {
-    protoProps.push(...Object.getOwnPropertyNames(proto).filter(m => m !== "constructor"));
-    proto = Object.getPrototypeOf(proto);
+  // ყველა property - own + proto
+  const all = new Set();
+  let o = inst;
+  while (o && o !== Object.prototype) {
+    Object.getOwnPropertyNames(o).forEach(k => all.add(k));
+    o = Object.getPrototypeOf(o);
   }
-  const allMethods = [...new Set([...ownProps, ...protoProps])];
-  console.log("own methods:", ownProps);
-  console.log("proto methods:", protoProps);
-  console.log("all methods:", allMethods);
+  console.log("ALL PROPS:", [...all].join(", "));
 
-  // მეთოდების სახელები — ვცდით რამდენიმე ვარიანტს
-  const kgName  = allMethods.find(m => /keyPair|keygen|keyGen/i.test(m));
-  const encName = allMethods.find(m => /encapsulat|encrypt/i.test(m));
-  const decName = allMethods.find(m => /decapsulat|decrypt/i.test(m));
-
-  console.log(`keyGen=${kgName}, enc=${encName}, dec=${decName}`);
-
-  if (!kgName || !encName || !decName) {
-    // fallback: პირდაპირ ვცდით ცნობილ სახელებს
-    console.log("⚠️  methods not found by name, trying known names...");
-    const candidates = ["generateKeyPair","keyGen","keygen","KeyGen"];
-    for (const c of candidates) {
-      try {
-        const r = await inst[c]();
-        if (r && r.publicKey) {
-          console.log(`✅ found working keyGen: ${c}`);
-          break;
-        }
-      } catch(e) {}
+  // ვცდით სახელებს პირდაპირ
+  const tryNames = async (names) => {
+    for (const n of names) {
+      if (typeof inst[n] === "function") {
+        try {
+          const r = await inst[n]();
+          if (r) { console.log("✅ works:", n); return n; }
+        } catch(e) {}
+      }
     }
+    return null;
+  };
+
+  const kg  = await tryNames(["generateKeyPair","keyGen","keygen","KeyGen","generate"]);
+  console.log("keyGen method:", kg);
+
+  let enc = null, dec = null;
+  if (kg) {
+    const kp = await inst[kg]();
+    console.log("keyPair keys:", Object.keys(kp));
+    enc = ["encapsulate","encrypt","Encrypt"].find(n => typeof inst[n] === "function");
+    dec = ["decapsulate","decrypt","Decrypt"].find(n => typeof inst[n] === "function");
+    console.log("enc:", enc, "dec:", dec);
   }
 
-  // ── 3. bundle ──────────────────────────────────────────────────
-  const kg  = kgName  || "generateKeyPair";
-  const enc = encName || "encapsulate";
-  const dec = decName || "decapsulate";
-
-  const entry = path.join(__dirname, "_kyber_entry.mjs");
-  fs.writeFileSync(entry, `
-import { Kyber768 } from "crystals-kyber-js";
-
-// instance ვქმნით — class-ია
-const _inst = new Kyber768();
-
-window.Kyber768 = {
-  KeyGen: async () => {
-    return await _inst["${kg}"]();
-  },
-  Encrypt: async (pk) => {
-    return await _inst["${enc}"](pk);
-  },
-  Decrypt: async (sk, ct) => {
-    // crystals-kyber-js: decapsulate(cipherText, secretKey)
-    return await _inst["${dec}"](ct, sk);
-  }
-};
-console.log("[kyber] Kyber768 ready, methods: ${kg}/${enc}/${dec}");
-`);
-
-  try {
-    const out = path.join(pubDir, "kyber.min.js");
-    execSync(
-      `./node_modules/.bin/esbuild ${entry} --bundle --minify --format=iife --outfile=${out}`,
-      { stdio: "inherit" }
-    );
-    fs.unlinkSync(entry);
-    console.log(`✅ kyber.min.js built (${(fs.statSync(out).size/1024).toFixed(1)}KB)`);
-  } catch(e) {
-    if (fs.existsSync(entry)) fs.unlinkSync(entry);
-    console.error("❌ bundle failed:", e.message);
+  if (!kg || !enc || !dec) {
+    console.error("❌ methods not found! all props:", [...all].join(", "));
     process.exit(1);
   }
 
-  console.log("✅ Build complete!\n");
+  // ── bundle ─────────────────────────────────────────────────────
+  const entry = path.join(__dirname, "_kyber_entry.mjs");
+  fs.writeFileSync(entry, `
+import { Kyber768 } from "crystals-kyber-js";
+const _inst = new Kyber768();
+window.Kyber768 = {
+  KeyGen:  async ()       => await _inst["${kg}"](),
+  Encrypt: async (pk)     => await _inst["${enc}"](pk),
+  Decrypt: async (sk, ct) => await _inst["${dec}"](ct, sk),
+};
+console.log("[kyber] ready: ${kg}/${enc}/${dec}");
+`);
+
+  const out = path.join(pubDir, "kyber.min.js");
+  execSync(`./node_modules/.bin/esbuild ${entry} --bundle --minify --format=iife --outfile=${out}`, { stdio: "inherit" });
+  fs.unlinkSync(entry);
+  console.log(`✅ kyber.min.js (${(fs.statSync(out).size/1024).toFixed(1)}KB)`);
 }
 
 main().catch(e => { console.error("❌", e.message); process.exit(1); });
