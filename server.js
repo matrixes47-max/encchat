@@ -57,6 +57,11 @@ const CONFIG = {
   MAX_ROOMS: 1000,               // Max concurrent rooms (DoS protection)
   MAX_MESSAGES_PER_ROOM: 500,
   MAX_KEYS_PER_ROOM: 10,
+
+  // Auto-delete & Session PFS
+  ROOM_INACTIVITY_TTL: 15 * 60 * 1000,  // 15 წუთი უაქტივობის შემდეგ ოთახი იშლება
+  SESSION_REKEY_MESSAGES: 100,            // N შეტყობინების შემდეგ re-key სიგნალი
+  SESSION_REKEY_TIME: 30 * 60 * 1000,    // ან 30 წუთის შემდეგ
   
   // Cleanup intervals
   CLEANUP_INTERVAL: 30_000,          // 30 seconds
@@ -77,6 +82,7 @@ const CONFIG = {
 const rooms = new Map();           // roomHash → Message[]
 const keys  = new Map();           // roomHash → {sid, pub, expires}[]
 const rateLimits = new Map();      // ip → {count, window, lastReset}
+const roomMeta = new Map();        // roomHash → {lastActivity, createdAt, msgCount}
 
 // ── Rate Limiting ─────────────────────────────────────────────────
 
@@ -233,11 +239,21 @@ function purgeKeys(roomHash) {
   alive.length === 0 ? keys.delete(roomHash) : keys.set(roomHash, alive);
 }
 
-// Enhanced background cleanup with memory monitoring
+// Enhanced background cleanup with memory monitoring + inactivity auto-delete
 setInterval(() => {
   const startTime = Date.now();
-  let cleaned = { rooms: 0, keys: 0, messages: 0 };
-  
+  let cleaned = { rooms: 0, keys: 0, messages: 0, inactive: 0 };
+
+  // Auto-delete inactive rooms (Session PFS: forces re-key on next join)
+  for (const [rh, meta] of roomMeta.entries()) {
+    if (startTime - meta.lastActivity > CONFIG.ROOM_INACTIVITY_TTL) {
+      rooms.delete(rh);
+      keys.delete(rh);
+      roomMeta.delete(rh);
+      cleaned.inactive++;
+    }
+  }
+
   // Clean rooms and count
   for (const [rh, msgs] of rooms.entries()) {
     const before = msgs.length;
@@ -246,24 +262,22 @@ setInterval(() => {
     cleaned.messages += (before - after);
     if (before > 0 && after === 0) cleaned.rooms++;
   }
-  
+
   // Clean keys
   for (const rh of keys.keys()) {
     const before = keys.has(rh) ? keys.get(rh).length : 0;
     purgeKeys(rh);
     if (before > 0 && !keys.has(rh)) cleaned.keys++;
   }
-  
+
   const duration = Date.now() - startTime;
-  
-  // Log if significant cleanup happened
-  if (cleaned.rooms > 0 || cleaned.keys > 0 || cleaned.messages > 10) {
-    console.log(`[CLEANUP] Purged ${cleaned.rooms} rooms, ${cleaned.keys} keysets, ${cleaned.messages} messages in ${duration}ms`);
+
+  if (cleaned.rooms > 0 || cleaned.keys > 0 || cleaned.messages > 10 || cleaned.inactive > 0) {
+    console.log(`[CLEANUP] Purged ${cleaned.rooms} rooms, ${cleaned.keys} keysets, ${cleaned.messages} msgs, ${cleaned.inactive} inactive rooms in ${duration}ms`);
   }
-  
-  // Memory monitoring
+
   const usage = process.memoryUsage();
-  if (usage.heapUsed > 100 * 1024 * 1024) { // Over 100MB
+  if (usage.heapUsed > 100 * 1024 * 1024) {
     console.warn(`[MEMORY] High usage: ${Math.round(usage.heapUsed / 1024 / 1024)}MB heap, ${rooms.size} rooms, ${keys.size} keysets`);
   }
 }, CONFIG.CLEANUP_INTERVAL);
@@ -354,14 +368,26 @@ app.get("/api/keys", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => 
  */
 app.get("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) => {
   const roomId = req.query.room;
-  
-  if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH)) 
+
+  if (!isValidString(roomId, CONFIG.MAX_ROOM_LENGTH))
     return res.json({ messages: [] });
 
   const roomHash = getRoomHash(roomId);
   purgeRoom(roomHash);
 
-  res.json({ messages: rooms.get(roomHash) || [] });
+  // Activity tracking for inactivity auto-delete
+  const meta = roomMeta.get(roomHash);
+  if (meta) { meta.lastActivity = Date.now(); roomMeta.set(roomHash, meta); }
+
+  const msgs = rooms.get(roomHash) || [];
+
+  // Session PFS: re-key სიგნალი
+  const rekey = meta
+    ? meta.msgCount >= CONFIG.SESSION_REKEY_MESSAGES ||
+      (Date.now() - meta.createdAt) >= CONFIG.SESSION_REKEY_TIME
+    : false;
+
+  res.json({ messages: msgs, rekey });
 });
 
 /**
@@ -410,6 +436,17 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
     return res.status(429).json({ error: "room full" });
   }
 
+  // roomMeta განახლება — inactivity tracking + session PFS counter
+  const now = Date.now();
+  const meta = roomMeta.get(roomHash) || { lastActivity: now, createdAt: now, msgCount: 0 };
+  meta.lastActivity = now;
+  meta.msgCount++;
+  roomMeta.set(roomHash, meta);
+
+  // Session PFS: re-key სიგნალი — 100 შეტყობინების ან 30 წუთის შემდეგ
+  const needsRekey = meta.msgCount >= CONFIG.SESSION_REKEY_MESSAGES ||
+                     (now - meta.createdAt) >= CONFIG.SESSION_REKEY_TIME;
+
   const record = {
     id:      crypto.randomUUID(),
     enc,
@@ -417,15 +454,15 @@ app.post("/api/messages", rateLimiter(CONFIG.RATE_LIMIT_MESSAGE_MAX), (req, res)
     dhPub,
     msgN,
     prevN,
-    // ±10 წამის jitter — timing correlation attack-ის წინააღმდეგ
-    ts:      Date.now() + Math.floor((Math.random() - 0.5) * 20_000),
+    // ±30 წამის jitter — timing correlation attack-ის წინააღმდეგ (v5: გაზრდილი)
+    ts:      Date.now() + Math.floor((Math.random() - 0.5) * 60_000),
     expires: Date.now() + ttlSecs * 1000
   };
 
   msgs.push(record);
   rooms.set(roomHash, msgs);
-  
-  res.json({ ok: true, id: record.id, ttl: ttlSecs });
+
+  res.json({ ok: true, id: record.id, ttl: ttlSecs, rekey: needsRekey });
 });
 
 /**
