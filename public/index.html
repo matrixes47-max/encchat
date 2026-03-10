@@ -590,6 +590,19 @@ window.addEventListener('DOMContentLoaded', function() {
   } else {
     console.log('✅ argon2 global OK');
   }
+  var privBtn = document.getElementById('privacy-btn');
+  if (privBtn) {
+    privBtn.addEventListener('click', function() {
+      var c = document.getElementById('privacy-content');
+      if (c.style.display === 'none') {
+        c.style.display = 'block';
+        privBtn.textContent = '[ ℹ️ Privacy Notice ▲ ]';
+      } else {
+        c.style.display = 'none';
+        privBtn.textContent = '[ ℹ️ Privacy Notice ▼ ]';
+      }
+    });
+  }
 });
 </script>
 <script src="/app.js"></script>
@@ -601,17 +614,7 @@ window.addEventListener('DOMContentLoaded', function() {
   font-size: 11px;
   text-align: center;
 ">
-  <button onclick="
-    var c = document.getElementById('privacy-content');
-    var b = document.getElementById('privacy-btn');
-    if(c.style.display==='none'){
-      c.style.display='block';
-      b.textContent='[ ℹ️ Privacy Notice ▲ ]';
-    } else {
-      c.style.display='none';
-      b.textContent='[ ℹ️ Privacy Notice ▼ ]';
-    }
-  " id="privacy-btn" style="
+  <button id="privacy-btn" style="
     background: none;
     border: 1px solid #333;
     color: #555;
