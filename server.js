@@ -473,6 +473,13 @@ app.delete("/api/room", rateLimiter(CONFIG.RATE_LIMIT_MAX_REQUESTS), (req, res) 
  * GET /health
  * Returns server status and stats
  */
+app.get("/debug-libs", (_, res) => {
+  const pub = path.join(__dirname, "public");
+  const kp = path.join(pub, "kyber.min.js"), ap = path.join(pub, "argon2.min.js");
+  const ke = fs.existsSync(kp), ae = fs.existsSync(ap);
+  res.json({ kyber: { exists: ke, size: ke ? fs.statSync(kp).size : 0, preview: ke ? fs.readFileSync(kp,"utf8").slice(0,400) : "NOT FOUND" }, argon2: { exists: ae, size: ae ? fs.statSync(ap).size : 0 }, files: fs.readdirSync(pub) });
+});
+
 app.get("/health", (_, res) => {
   res.json({ 
     status: "ok", 
