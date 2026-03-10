@@ -197,45 +197,6 @@ if (CONFIG.TRUST_PROXY) {
 }
 
 app.use(express.json({ limit: CONFIG.MAX_REQUEST_SIZE }));
-// kyber.min.js — ESM dynamic import → browser global
-app.get("/kyber.min.js", async (req, res) => {
-  try {
-    const lib = await import("crystals-kyber-js");
-    const KyberClass = lib.Kyber768;
-    if (typeof KyberClass !== "function") throw new Error("Kyber768 class not found");
-
-    // instance-ს ვქმნით — class-ია, არა static object
-    const K = new KyberClass();
-
-    // instance მეთოდების სახელები
-    const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(K));
-    console.log("Kyber768 instance methods:", proto);
-
-    const browser = `!function(){
-var _lib=(function(){
-var module={exports:{}};
-// Kyber768 class-ს ვქმნით და window-ში ვდებთ
-window._KyberClass=${KyberClass.toString()};
-try {
-  var inst = new window._KyberClass();
-  window.Kyber768 = {
-    KeyGen: function(){ return inst.generateKeyPair ? inst.generateKeyPair() : inst.keyGen ? inst.keyGen() : inst.keygen(); },
-    Encrypt: function(pk){ return inst.encapsulate ? inst.encapsulate(pk) : inst.encrypt(pk); },
-    Decrypt: function(sk,ct){ return inst.decapsulate ? inst.decapsulate(sk,ct) : inst.decrypt(sk,ct); }
-  };
-  console.log("Kyber768 loaded, methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(inst)));
-} catch(e){ console.error("Kyber768 init error:",e); }
-})();
-}();`;
-
-    res.setHeader("Content-Type", "application/javascript");
-    res.send(browser);
-  } catch(e) {
-    console.error("❌ kyber route:", e.message);
-    res.status(500).send("// kyber error: " + e.message);
-  }
-});
-
 app.use(express.static(path.join(__dirname, "public")));
 
 // ── Validation Helpers ────────────────────────────────────────────

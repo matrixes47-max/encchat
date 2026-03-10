@@ -5,12 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "postinstall": "node build-kyber.js"
   },
   "dependencies": {
     "express": "4.18.2",
     "crystals-kyber-js": "1.0.0",
-    "argon2-browser": "1.18.0"
+    "argon2-browser": "1.18.0",
+    "esbuild": "0.25.0"
   },
   "engines": {
     "node": ">=18.0.0"
