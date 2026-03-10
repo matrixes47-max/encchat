@@ -501,11 +501,11 @@ async function tryInitPQXDH() {
 
     if (them.pqct) {
       // They already encapsulated to our ML-KEM pub — we decapsulate
-      mlkemSS = mlkemDecapsulate(_myMlkemPriv, b64ToBuf(them.pqct));
+      mlkemSS = await mlkemDecapsulate(_myMlkemPriv, b64ToBuf(them.pqct));
     } else {
       // We encapsulate to their ML-KEM pub — they will decapsulate
       showJoinStatus("🔮 ML-KEM-768...");
-      const { cipherText, sharedSecret } = mlkemEncapsulate(b64ToBuf(them.mlkemPub));
+      const { cipherText, sharedSecret } = await mlkemEncapsulate(b64ToBuf(them.mlkemPub));
       mlkemSS = sharedSecret;
 
       // Upload our pqct so they can decapsulate
@@ -564,7 +564,7 @@ async function joinRoom() {
 
     // 3. ML-KEM-768 keypair
     showJoinStatus("🔮 ML-KEM-768 გასაღებები...");
-    const mlkemKeys = mlkemKeyGen();
+    const mlkemKeys = await mlkemKeyGen();
     _myMlkemPriv = mlkemKeys.privateKey;
     _myMlkemPub  = mlkemKeys.publicKey;
     showJoinStatus("");
