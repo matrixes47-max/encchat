@@ -735,6 +735,18 @@ async function fetchAndRender() {
     const roomHash = await hashRoomId(currentRoom);
     const res  = await fetch(`/api/messages?room=${encodeURIComponent(roomHash)}`);
     const data = await res.json();
+
+    // Session PFS სიგნალი — სერვერი გვეუბნება re-key დრო
+    if (data.rekey && dr && dr.ready) {
+      const sb = document.getElementById("status-bar");
+      if (sb && !sb.dataset.rekeyShown) {
+        sb.dataset.rekeyShown = "1";
+        showChatNotice("🔄 Session PFS: Re-key — დატოვე ოთახი და ხელახლა შემოდი ახალი გასაღებებით.");
+        sb.style.color = "#884400";
+        sb.textContent = "⚠️ session re-key recommended · " + sb.textContent;
+      }
+    }
+
     await renderMessages(data.messages || []);
   } catch { /* silent */ }
 }
