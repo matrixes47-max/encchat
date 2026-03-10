@@ -601,8 +601,17 @@ async function joinRoom() {
     pollInterval = setInterval(poll, 3000);
     tickInterval = setInterval(tickTimers, 1000);
   } catch (e) {
-    showError("შეცდომა. სცადეთ თავიდან.");
-    console.error(e);
+    let msg = "შეცდომა. სცადეთ თავიდან.";
+    if (e && e.message) {
+      if (e.message.includes("argon2") || e.message.includes("wasm") || e.message.includes("Argon"))
+        msg = "❌ Argon2 ვერ ჩაიტვირთა. გვერდი გადაიტვირთეთ (F5).";
+      else if (e.message.includes("Kyber") || e.message.includes("kyber"))
+        msg = "❌ Kyber ვერ ჩაიტვირთა. გვერდი გადაიტვირთეთ (F5).";
+      else
+        msg = "❌ " + e.message;
+    }
+    showError(msg);
+    console.error("[joinRoom] error:", e);
   } finally {
     document.getElementById("join-btn").disabled    = false;
     document.getElementById("join-btn").textContent = "შესვლა";
