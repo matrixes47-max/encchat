@@ -593,5 +593,57 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <script src="/app.js"></script>
+
+<div id="privacy-notice" style="
+  max-width: 600px;
+  margin: 40px auto 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  text-align: center;
+">
+  <button onclick="
+    var c = document.getElementById('privacy-content');
+    var b = document.getElementById('privacy-btn');
+    if(c.style.display==='none'){
+      c.style.display='block';
+      b.textContent='[ ℹ️ Privacy Notice ▲ ]';
+    } else {
+      c.style.display='none';
+      b.textContent='[ ℹ️ Privacy Notice ▼ ]';
+    }
+  " id="privacy-btn" style="
+    background: none;
+    border: 1px solid #333;
+    color: #555;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 6px 16px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  ">[ ℹ️ Privacy Notice ▼ ]</button>
+
+  <div id="privacy-content" style="
+    display: none;
+    margin-top: 10px;
+    padding: 16px 20px;
+    border: 1px solid #1a1a1a;
+    border-left: 3px solid #cc0000;
+    background: #0d0d0d;
+    color: #555;
+    line-height: 1.7;
+    letter-spacing: 0.5px;
+    text-align: left;
+  ">
+    <p style="margin:0 0 10px;">encchat არის open-source, end-to-end დაშიფრული სერვისი. ისევე როგორც Signal, Tor, ProtonMail და სხვა აღიარებული პლატფორმები — ვერც ერთი სერვისი ვერ იძლევა 100%-იანი გარანტიას. კიბერუსაფრთხოება ყოველთვის განვითარების პროცეშია.</p>
+    <p style="margin:0 0 6px;color:#666;">რატომ გამოირჩევა encchat:</p>
+    <p style="margin:0 0 2px;">— Signal-ისგან განსხვავებით, ტელეფონის ნომერი არ სჭირდება</p>
+    <p style="margin:0 0 2px;">— სერვერი ვერ ხედავს შეტყობინებებს, ოთახის სახელს ან IP-ს</p>
+    <p style="margin:0 0 2px;">— Post-Quantum დაცვა (ML-KEM-768) — კვანტური კომპიუტერიც ვერ გატეხს</p>
+    <p style="margin:0 0 10px;">— Tor-თან თავსებადია</p>
+    <p style="margin:0 0 10px;">სერვისი ანონიმურია: არ ინახება IP, სახელი, ანგარიში ან შეტყობინებების შინაარსი. გამოყენება ხდება მომხმარებლის საკუთარი პასუხისმგებლობით.</p>
+    <p style="margin:0;color:#444;">encchat-ის გამოყენებით თქვენ ეთანხმებით ამ პირობებს.</p>
+  </div>
+</div>
+
 </body>
 </html>
