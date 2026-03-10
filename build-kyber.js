@@ -34,7 +34,6 @@ window.argon2 = {
     return { hash };
   }
 };
-console.log("[argon2] hash-wasm ready — no Worker, CSP-safe");
 `);
     const argonOut = path.join(pubDir, "argon2.min.js");
     execSync(
@@ -58,7 +57,6 @@ window._x25519 = {
   getPublicKey:       (priv) => x25519.getPublicKey(priv),
   getSharedSecret:    (priv, pub) => x25519.getSharedSecret(priv, pub),
 };
-console.log("[x25519] @noble/curves ready");
 `);
     const x25519Out = path.join(pubDir, "x25519.min.js");
     execSync(
@@ -153,7 +151,6 @@ window.Kyber768 = {
   Encrypt: ${encWrapper},
   Decrypt: ${decWrapper},
 };
-console.log("[kyber] ready: ${kg}/${enc}/${dec}");
 `);
 
   const out = path.join(pubDir, "kyber.min.js");
