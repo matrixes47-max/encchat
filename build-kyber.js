@@ -45,6 +45,30 @@ console.log("[argon2] hash-wasm ready — no Worker, CSP-safe");
     console.log(`✅ argon2-bundled.min.js via hash-wasm (${(fs.statSync(argonOut).size/1024).toFixed(1)}KB)`);
   }
 
+  // ── x25519 via @noble/curves ──────────────────────────────────
+  // WebCrypto X25519 (namedCurve:"X25519") is not supported on older
+  // Android browsers. @noble/curves is pure JS, works everywhere.
+  // Exposes window._x25519 with: generatePrivateKey, getPublicKey, getSharedSecret
+  {
+    const x25519Entry = path.join(__dirname, "_x25519_entry.mjs");
+    fs.writeFileSync(x25519Entry, `
+import { x25519 } from "@noble/curves/ed25519";
+window._x25519 = {
+  generatePrivateKey: () => x25519.utils.randomPrivateKey(),
+  getPublicKey:       (priv) => x25519.getPublicKey(priv),
+  getSharedSecret:    (priv, pub) => x25519.getSharedSecret(priv, pub),
+};
+console.log("[x25519] @noble/curves ready");
+`);
+    const x25519Out = path.join(pubDir, "x25519.min.js");
+    execSync(
+      `./node_modules/.bin/esbuild ${x25519Entry} --bundle --minify --format=iife --outfile=${x25519Out}`,
+      { stdio: "inherit" }
+    );
+    fs.unlinkSync(x25519Entry);
+    console.log(`✅ x25519.min.js via @noble/curves (${(fs.statSync(x25519Out).size/1024).toFixed(1)}KB)`);
+  }
+
   // ── kyber: detect API ─────────────────────────────────────────
   const lib = await import("crystals-kyber-js");
   const inst = new lib.Kyber768();

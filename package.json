@@ -12,6 +12,7 @@
     "express": "4.18.2",
     "crystals-kyber-js": "1.0.0",
     "hash-wasm": "4.11.0",
+    "@noble/curves": "1.4.0",
     "esbuild": "0.25.0"
   },
   "engines": {
