@@ -37,30 +37,7 @@ jobs:
           open('android/app/src/main/res/mipmap-$d/ic_launcher.png','wb').write(png(48,48))
           "
           done
-          sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/ic_launcher"/' android/app/src/main/AndroidManifest.xml
-          sed -i '/package="com.encchat.app"/d' android/app/src/main/AndroidManifest.xml
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.0'
-
-      - name: Generate Gradle Wrapper
-        working-directory: android
-        run: gradle wrapper --gradle-version 8.0
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: encchat-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
