@@ -46,7 +46,7 @@ const CONFIG = {
   // Rate limiting
   RATE_LIMIT_WINDOW: 60 * 1000,      // 1 minute window
   RATE_LIMIT_MAX_REQUESTS: 60,       // 60 requests per minute per IP
-  RATE_LIMIT_MESSAGE_MAX: 20,        // 20 messages per minute per IP
+  RATE_LIMIT_MESSAGE_MAX: 60,        // 60 messages per minute per IP
   
   // TTL limits
   MIN_TTL: 10,                       // Minimum 10 seconds
