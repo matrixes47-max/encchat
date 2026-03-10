@@ -194,19 +194,19 @@ async function importX25519Pub(b64) {
 //  NIST FIPS 203 — 2024 სტანდარტი
 // ════════════════════════════════════════════════════════════════════
 
-function mlkemKeyGen() {
-  // crystals-kyber-js: Kyber768.KeyGen() → { publicKey: Uint8Array(1184), privateKey: Uint8Array(2400) }
-  return Kyber768.KeyGen();
+async function mlkemKeyGen() {
+  // crystals-kyber-js v1.0.0: generateKeyPair() → { publicKey, privateKey }
+  return await Kyber768.KeyGen();
 }
 
-function mlkemEncapsulate(theirPublicKey) {
-  // Kyber768.Encrypt(pk) → { cipherText: Uint8Array(1088), sharedSecret: Uint8Array(32) }
-  return Kyber768.Encrypt(theirPublicKey);
+async function mlkemEncapsulate(theirPublicKey) {
+  // encapsulate(pk) → { cipherText, sharedSecret }
+  return await Kyber768.Encrypt(theirPublicKey);
 }
 
-function mlkemDecapsulate(myPrivateKey, cipherText) {
-  // Kyber768.Decrypt(sk, ct) → Uint8Array(32)
-  return Kyber768.Decrypt(myPrivateKey, cipherText);
+async function mlkemDecapsulate(myPrivateKey, cipherText) {
+  // decapsulate(ct, sk) → sharedSecret (Uint8Array)
+  return await Kyber768.Decrypt(myPrivateKey, cipherText);
 }
 
 
