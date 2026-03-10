@@ -499,19 +499,21 @@ async function tryInitPQXDH() {
     const theirX25519 = await importX25519Pub(them.pub);
     const dhOut       = await x25519DH(_myX25519.privateKey, theirX25519);
 
+    // Race condition fix: role დეტერმინისტულად გამოიყვანება key შედარებით.
+    // ვინც პატარა pub key-ი აქვს — ყოველთვის "alice" (decapsulator).
+    // ვინც დიდი — ყოველთვის "bob" (encapsulator).
+    // ეს გამორიცხავს ორმაგი encapsulation-ს თანაბარი join-ისას.
+    const iAmBob = _myX25519B64 > them.pub;
+
     let mlkemSS;
 
-    if (them.pqct) {
-      // They already encapsulated to our ML-KEM pub — we decapsulate
-      mlkemSS = await mlkemDecapsulate(_myMlkemPriv, b64ToBuf(them.pqct));
-    } else {
-      // We encapsulate to their ML-KEM pub — they will decapsulate
+    if (iAmBob) {
+      // ჩვენ ვართ bob — encapsulate ვუკეთებთ alice-ის mlkem pub-ს
+      if (!them.mlkemPub) return false; // alice-ს mlkem pub ჯერ არ გამოუქვეყნებია
       showJoinStatus("🔮 ML-KEM-768...");
       const { cipherText, sharedSecret } = await mlkemEncapsulate(b64ToBuf(them.mlkemPub));
       mlkemSS = sharedSecret;
 
-      // Upload our pqct so they can decapsulate
-      // FIX: roomHash გამოვიყენოთ — currentRoom (plain) კი არა
       const pqctRoomHash = await hashRoomId(currentRoom);
       await fetch("/api/keys", {
         method: "POST",
@@ -525,6 +527,10 @@ async function tryInitPQXDH() {
         })
       });
       showJoinStatus("");
+    } else {
+      // ჩვენ ვართ alice — bob-ის pqct-ს ველოდებით
+      if (!them.pqct) return false; // bob-ს pqct ჯერ არ გამოუქვეყნებია
+      mlkemSS = await mlkemDecapsulate(_myMlkemPriv, b64ToBuf(them.pqct));
     }
 
     // PQXDH: combine X25519 + ML-KEM + Argon2id
