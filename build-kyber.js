@@ -19,7 +19,7 @@ async function main() {
     }
   } catch(e) { console.error("❌ argon2:", e.message); }
 
-  // ── kyber: ყველა method name ვცდით ─────────────────────────────
+  // ── kyber: detect API ─────────────────────────────────────────
   const lib = await import("crystals-kyber-js");
   const inst = new lib.Kyber768();
 
@@ -32,35 +32,66 @@ async function main() {
   }
   console.log("ALL PROPS:", [...all].join(", "));
 
-  // ვცდით სახელებს პირდაპირ
-  const tryNames = async (names) => {
-    for (const n of names) {
-      if (typeof inst[n] === "function") {
-        try {
-          const r = await inst[n]();
-          if (r) { console.log("✅ works:", n); return n; }
-        } catch(e) {}
-      }
+  // ── keyGen detection ──────────────────────────────────────────
+  const keyGenNames = ["generateKeyPair","keyGen","keygen","KeyGen","generate"];
+  let kg = null;
+  for (const n of keyGenNames) {
+    if (typeof inst[n] === "function") {
+      console.log("✅ keyGen method found:", n);
+      kg = n;
+      break;
     }
-    return null;
-  };
-
-  const kg  = await tryNames(["generateKeyPair","keyGen","keygen","KeyGen","generate"]);
-  console.log("keyGen method:", kg);
-
-  let enc = null, dec = null;
-  if (kg) {
-    const kp = await inst[kg]();
-    console.log("keyPair keys:", Object.keys(kp));
-    enc = ["encapsulate","encrypt","Encrypt"].find(n => typeof inst[n] === "function");
-    dec = ["decapsulate","decrypt","Decrypt"].find(n => typeof inst[n] === "function");
-    console.log("enc:", enc, "dec:", dec);
   }
 
-  if (!kg || !enc || !dec) {
-    console.error("❌ methods not found! all props:", [...all].join(", "));
+  if (!kg) {
+    console.error("❌ keyGen not found! props:", [...all].join(", "));
     process.exit(1);
   }
+
+  // ── detect return format of keyGen ───────────────────────────
+  const kpRaw = await inst[kg]();
+  // crystals-kyber-js v1.0.0 returns [pk, sk] array (not object)
+  const kpIsArray = Array.isArray(kpRaw);
+  console.log("keyGen returns array:", kpIsArray, "| keys:", Object.keys(kpRaw));
+
+  // ── enc/dec method detection ──────────────────────────────────
+  // FIX: Added "encap"/"decap" — actual method names in crystals-kyber-js v1.0.0
+  const enc = ["encap","encapsulate","encrypt","Encrypt"].find(n => typeof inst[n] === "function");
+  const dec = ["decap","decapsulate","decrypt","Decrypt"].find(n => typeof inst[n] === "function");
+  console.log("enc method:", enc, "| dec method:", dec);
+
+  if (!enc || !dec) {
+    console.error("❌ enc/dec not found! props:", [...all].join(", "));
+    process.exit(1);
+  }
+
+  // ── detect return format of encap ────────────────────────────
+  const testPk = kpIsArray ? kpRaw[0] : kpRaw.publicKey;
+  const encRaw = await inst[enc](testPk);
+  const encIsArray = Array.isArray(encRaw);
+  console.log("encap returns array:", encIsArray, "| keys:", Object.keys(encRaw));
+
+  // ── build wrappers matching app.js expected API ───────────────
+  //
+  // app.js expects:
+  //   Kyber768.KeyGen()       → { publicKey, privateKey }
+  //   Kyber768.Encrypt(pk)    → { cipherText, sharedSecret }
+  //   Kyber768.Decrypt(sk,ct) → sharedSecret (Uint8Array)
+  //
+  // crystals-kyber-js v1.0.0 actual:
+  //   generateKeyPair()  → [pk, sk]   (array)
+  //   encap(pk)          → [ct, ss]   (array)
+  //   decap(ct, sk)      → ss         (Uint8Array)
+
+  const keyGenWrapper = kpIsArray
+    ? `async () => { const [pk,sk] = await _inst["${kg}"](); return { publicKey: pk, privateKey: sk }; }`
+    : `async () => await _inst["${kg}"]()`;
+
+  const encWrapper = encIsArray
+    ? `async (pk) => { const [ct,ss] = await _inst["${enc}"](pk); return { cipherText: ct, sharedSecret: ss }; }`
+    : `async (pk) => await _inst["${enc}"](pk)`;
+
+  const decWrapper = `async (sk, ct) => await _inst["${dec}"](ct, sk)`;
 
   // ── bundle ─────────────────────────────────────────────────────
   const entry = path.join(__dirname, "_kyber_entry.mjs");
@@ -68,9 +99,9 @@ async function main() {
 import { Kyber768 } from "crystals-kyber-js";
 const _inst = new Kyber768();
 window.Kyber768 = {
-  KeyGen:  async ()       => await _inst["${kg}"](),
-  Encrypt: async (pk)     => await _inst["${enc}"](pk),
-  Decrypt: async (sk, ct) => await _inst["${dec}"](ct, sk),
+  KeyGen:  ${keyGenWrapper},
+  Encrypt: ${encWrapper},
+  Decrypt: ${decWrapper},
 };
 console.log("[kyber] ready: ${kg}/${enc}/${dec}");
 `);
