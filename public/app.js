@@ -171,20 +171,22 @@ async function deriveSK_Argon2id(password, roomId) {
 // ════════════════════════════════════════════════════════════════════
 
 async function generateX25519() {
-  return crypto.subtle.generateKey({ name: "ECDH", namedCurve: "X25519" }, true, ["deriveBits"]);
+  // WebCrypto X25519 არ მუშაობს ყველა ბრაუზერში — @noble/curves გამოვიყენოთ
+  const privateKey = window._x25519.generatePrivateKey();
+  const publicKey  = window._x25519.getPublicKey(privateKey);
+  return { privateKey, publicKey }; // ორივე Uint8Array
 }
 
 async function x25519DH(privateKey, publicKey) {
-  const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
-  return new Uint8Array(bits);
+  return window._x25519.getSharedSecret(privateKey, publicKey);
 }
 
 async function exportX25519Pub(keypair) {
-  return bufToB64(new Uint8Array(await crypto.subtle.exportKey("raw", keypair.publicKey)));
+  return bufToB64(keypair.publicKey);
 }
 
 async function importX25519Pub(b64) {
-  return crypto.subtle.importKey("raw", b64ToBuf(b64), { name: "ECDH", namedCurve: "X25519" }, true, []);
+  return b64ToBuf(b64); // Uint8Array — პირდაპირ გამოიყენება x25519DH-ში
 }
 
 
