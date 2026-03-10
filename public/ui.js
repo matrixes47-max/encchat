@@ -146,8 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var infoEl = document.getElementById('join-info');
   if (infoEl && window._fingerprintDefense) {
     var badge = document.createElement('span');
-    badge.style.color = '#004400';
-    badge.textContent = '— 🛡️ Fingerprint Defense: Canvas · WebGL · Audio · Screen · Battery';
+    badge.textContent = '— Fingerprint Defense: Canvas · WebGL · Audio · Screen · Battery';
     infoEl.appendChild(badge);
   }
 
