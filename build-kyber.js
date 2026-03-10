@@ -6,23 +6,42 @@ async function main() {
   const pubDir = path.join(__dirname, "public");
   if (!fs.existsSync(pubDir)) fs.mkdirSync(pubDir, { recursive: true });
 
-  // ── argon2 (bundled — WASM inline, no separate fetch/Worker needed) ──
+  // ── argon2 ────────────────────────────────────────────────────
+  // index.html loads: /argon2-bundled.min.js
+  // argon2-browser@1.18.0 dist may or may not have the bundled version.
+  // Strategy: prefer argon2-bundled.min.js; fallback — copy argon2.min.js
+  // as argon2-bundled.min.js (won't work alone) OR copy all + rename.
   try {
     const wasmDir = path.join(__dirname, "node_modules/argon2-browser/dist");
-    if (fs.existsSync(wasmDir)) {
-      // Prefer bundled version: no external WASM fetch, no Worker blob URL, CSP-friendly
-      const bundled = path.join(wasmDir, "argon2-bundled.min.js");
-      if (fs.existsSync(bundled)) {
-        fs.copyFileSync(bundled, path.join(pubDir, "argon2-bundled.min.js"));
-        console.log("✅ argon2-bundled.min.js copied");
-      } else {
-        // Fallback: copy everything and hope for the best
-        for (const f of fs.readdirSync(wasmDir)) {
-          if (f.endsWith(".js") || f.endsWith(".wasm")) {
-            fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
-          }
+    if (!fs.existsSync(wasmDir)) throw new Error("argon2-browser/dist not found");
+
+    const distFiles = fs.readdirSync(wasmDir);
+    console.log("argon2-browser dist files:", distFiles.join(", "));
+
+    const bundledSrc = path.join(wasmDir, "argon2-bundled.min.js");
+    if (fs.existsSync(bundledSrc)) {
+      // ✅ bundled version exists — copy it directly (WASM inlined, no fetch needed)
+      fs.copyFileSync(bundledSrc, path.join(pubDir, "argon2-bundled.min.js"));
+      console.log("✅ argon2-bundled.min.js copied (bundled/WASM-inlined)");
+    } else {
+      // Fallback: package has argon2.min.js + argon2.wasm separately
+      // Copy argon2.wasm to public/ so the script can fetch it
+      // Copy argon2.min.js as argon2-bundled.min.js (it will fetch argon2.wasm from same path)
+      const minSrc  = path.join(wasmDir, "argon2.min.js");
+      const wasmSrc = path.join(wasmDir, "argon2.wasm");
+      if (fs.existsSync(minSrc)) {
+        fs.copyFileSync(minSrc, path.join(pubDir, "argon2-bundled.min.js"));
+        console.log("✅ argon2.min.js → argon2-bundled.min.js copied (fallback)");
+      }
+      if (fs.existsSync(wasmSrc)) {
+        fs.copyFileSync(wasmSrc, path.join(pubDir, "argon2.wasm"));
+        console.log("✅ argon2.wasm copied");
+      }
+      // Also copy any other .js/.wasm just in case
+      for (const f of distFiles) {
+        if ((f.endsWith(".js") || f.endsWith(".wasm")) && f !== "argon2.min.js" && f !== "argon2.wasm") {
+          fs.copyFileSync(path.join(wasmDir, f), path.join(pubDir, f));
         }
-        console.log("✅ argon2 files copied (fallback)");
       }
     }
   } catch(e) { console.error("❌ argon2:", e.message); }
