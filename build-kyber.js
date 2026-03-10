@@ -38,7 +38,7 @@ console.log("[argon2] hash-wasm ready — no Worker, CSP-safe");
 `);
     const argonOut = path.join(pubDir, "argon2-bundled.min.js");
     execSync(
-      `./node_modules/.bin/esbuild ${argonEntry} --bundle --minify --format=iife --outfile=${argonOut}`,
+      `./node_modules/.bin/esbuild ${argonEntry} --bundle --minify --format=iife --loader:.wasm=binary --outfile=${argonOut}`,
       { stdio: "inherit" }
     );
     fs.unlinkSync(argonEntry);
@@ -133,7 +133,7 @@ console.log("[kyber] ready: ${kg}/${enc}/${dec}");
 `);
 
   const out = path.join(pubDir, "kyber.min.js");
-  execSync(`./node_modules/.bin/esbuild ${entry} --bundle --minify --format=iife --outfile=${out}`, { stdio: "inherit" });
+  execSync(`./node_modules/.bin/esbuild ${entry} --bundle --minify --format=iife --loader:.wasm=binary --outfile=${out}`, { stdio: "inherit" });
   fs.unlinkSync(entry);
   console.log(`✅ kyber.min.js (${(fs.statSync(out).size/1024).toFixed(1)}KB)`);
 }
