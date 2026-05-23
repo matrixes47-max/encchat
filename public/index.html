@@ -110,72 +110,58 @@ body.in-chat #lang-switcher {
     <span data-ka="— IP არ ინახება · Timestamp jitter · Zero-Knowledge" data-en="— No IP stored · Timestamp jitter · Zero-Knowledge">— IP არ ინახება · Timestamp jitter · Zero-Knowledge</span>
     <span data-ka="— Tab დახურვისას გასაღებები დაუყოვნებლივ იშლება" data-en="— Keys are wiped immediately on tab close">— Tab დახურვისას გასაღებები დაუყოვნებლივ იშლება</span>
     <span data-ka="— შეტყობინება თვითგანადგურდება" data-en="— Messages self-destruct">— შეტყობინება თვითგანადგურდება</span>
-    <span data-ka="— Multi-Hop Proxy · შენი მოწყობილობა პირდაპირ არ უკავშირდება encchat-ის სერვერს · ყველა კავშირი გადის 4 დამოუკიდებელი სერვერის გავლით — Cloudflare, Deno Deploy, Vercel და Render.com · ოთხივე სხვადასხვა კომპანიაა, სხვადასხვა ქვეყანაში · ინტერნეტ პროვაიდერი და ნებისმიერი გარე დამკვირვებელი ვერ ხედავს სრულ გზას და ვერ აიდენტიფიცირებს encchat-ის რეალურ სერვერს" data-en="— Multi-Hop Proxy · Your device never connects directly to encchat's server · All traffic is routed through 4 independent servers — Cloudflare, Deno Deploy, Vercel and Render.com · Each is a separate company in a different country · Your internet provider and any external observer cannot see the full path and cannot identify encchat's real server">— Multi-Hop Proxy · შენი მოწყობილობა პირდაპირ არ უკავშირდება encchat-ის სერვერს · ყველა კავშირი გადის 4 დამოუკიდებელი სერვერის გავლით — Cloudflare, Deno Deploy, Vercel და Render.com · ოთხივე სხვადასხვა კომპანიაა, სხვადასხვა ქვეყანაში · ინტერნეტ პროვაიდერი და ნებისმიერი გარე დამკვირვებელი ვერ ხედავს სრულ გზას და ვერ აიდენტიფიცირებს encchat-ის რეალურ სერვერს</span>
   </div>
 
-  <a id="android-badge" href="https://github.com/matrixes47-max/encchat/releases/latest/download/encchat.apk" download style="display:block;margin:20px auto 0;max-width:260px;cursor:pointer;text-decoration:none;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 160" width="100%" style="display:block;border-radius:20px;box-shadow:0 0 24px #cc220033;">
+  <a id="android-badge" href="https://github.com/matrixes47-max/encchat/releases/latest/download/encchat.apk" download style="display:block;margin:30px auto 0;max-width:320px;cursor:pointer;text-decoration:none;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450 180" width="100%" style="display:block;border-radius:24px;box-shadow:0 0 35px rgba(255, 34, 0, 0.25);">
       <defs>
-        <radialGradient id="bg2" cx="30%" cy="50%" r="70%">
-          <stop offset="0%" stop-color="#1c0000"/>
-          <stop offset="100%" stop-color="#0a0000"/>
+        <radialGradient id="bg2" cx="50%" cy="50%" r="80%">
+          <stop offset="0%" stop-color="#220000"/>
+          <stop offset="100%" stop-color="#050000"/>
         </radialGradient>
-        <filter id="glow2">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-        <filter id="softglow2">
-          <feGaussianBlur stdDeviation="6" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        <filter id="glow2" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
         </filter>
         <linearGradient id="btngrad2" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#cc2200"/>
-          <stop offset="100%" stop-color="#880000"/>
-        </linearGradient>
-        <linearGradient id="shine2" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08"/>
-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          <stop offset="0%" stop-color="#ff3300"/>
+          <stop offset="100%" stop-color="#991100"/>
         </linearGradient>
       </defs>
-      <rect width="420" height="160" rx="20" fill="url(#bg2)"/>
-      <rect width="420" height="160" rx="20" fill="none" stroke="#330000" stroke-width="1.5"/>
-      <line x1="0" y1="40" x2="420" y2="40" stroke="#1f0000" stroke-width="0.5"/>
-      <line x1="0" y1="80" x2="420" y2="80" stroke="#1f0000" stroke-width="0.5"/>
-      <line x1="0" y1="120" x2="420" y2="120" stroke="#1f0000" stroke-width="0.5"/>
-      <line x1="105" y1="0" x2="105" y2="160" stroke="#1f0000" stroke-width="0.5"/>
-      <line x1="210" y1="0" x2="210" y2="160" stroke="#1f0000" stroke-width="0.5"/>
-      <line x1="315" y1="0" x2="315" y2="160" stroke="#1f0000" stroke-width="0.5"/>
-      <polygon points="72,30 102,47 102,81 72,98 42,81 42,47" fill="none" stroke="#cc2200" stroke-width="1.5" filter="url(#glow2)" opacity="0.8"/>
-      <polygon points="72,36 96,50 96,78 72,92 48,78 48,50" fill="#0f0000"/>
-      <rect x="61" y="59" width="22" height="18" rx="3" fill="none" stroke="#ff2200" stroke-width="2" filter="url(#glow2)"/>
-      <path d="M66,60 Q66,50 72,50 Q78,50 78,60" fill="none" stroke="#ff2200" stroke-width="2" stroke-linecap="round" filter="url(#glow2)"/>
-      <circle cx="72" cy="66" r="3" fill="#ff2200" filter="url(#softglow2)"/>
-      <rect x="70.5" y="66" width="3" height="5" rx="1" fill="#ff2200"/>
-      <text x="114" y="62" font-family="'Courier New', monospace" font-size="28" font-weight="700" letter-spacing="2" fill="#ff2200" filter="url(#glow2)">encchat</text>
-      <text x="114" y="80" font-family="'Courier New', monospace" font-size="8" letter-spacing="2.5" fill="#661100" opacity="0.9">POST-QUANTUM · ZERO-KNOWLEDGE</text>
-      <line x1="114" y1="88" x2="290" y2="88" stroke="#2a0000" stroke-width="1"/>
-      <text x="114" y="102" font-family="'Courier New', monospace" font-size="7.5" letter-spacing="1" fill="#440000">ML-KEM-1024 · X25519 · AES-256-GCM · Double Ratchet</text>
-      <rect x="308" y="20" width="96" height="120" rx="14" fill="url(#btngrad2)"/>
-      <rect x="308" y="20" width="96" height="60" rx="14" fill="url(#shine2)"/>
-      <rect x="308" y="20" width="96" height="120" rx="14" fill="none" stroke="#ff4400" stroke-width="1" opacity="0.4"/>
-      <line x1="356" y1="42" x2="356" y2="82" stroke="white" stroke-width="3" stroke-linecap="round"/>
-      <polyline points="340,68 356,86 372,68" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <line x1="340" y1="94" x2="372" y2="94" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
-      <text x="356" y="114" font-family="'Courier New', monospace" font-size="11" font-weight="700" letter-spacing="1" text-anchor="middle" fill="white">.APK</text>
-      <text x="356" y="130" font-family="'Courier New', monospace" font-size="8" letter-spacing="0.5" text-anchor="middle" fill="rgba(255,255,255,0.6)">Android 7+</text>
-      <text id="apk-dl-text" x="356" y="148" font-family="'Courier New', monospace" font-size="7" letter-spacing="1" text-anchor="middle" fill="rgba(255,100,50,0.7)">▼ ჩამოტვირთვა</text>
+      <rect width="450" height="180" rx="24" fill="url(#bg2)" stroke="#440000" stroke-width="2"/>
+      
+      <!-- LOGO AREA -->
+      <g transform="translate(30, 45)">
+        <polygon points="40,0 75,20 75,60 40,80 5,60 5,20" fill="#110000" stroke="#ff2200" stroke-width="2.5" filter="url(#glow2)"/>
+        <path d="M30,35 Q30,22 40,22 Q50,22 50,35 L50,45 L30,45 Z" fill="none" stroke="#ff2200" stroke-width="2.5" filter="url(#glow2)"/>
+        <rect x="25" y="45" width="30" height="22" rx="4" fill="#ff2200"/>
+        <circle cx="40" cy="56" r="3" fill="#000"/>
+      </g>
+
+      <!-- TEXT AREA -->
+      <text x="125" y="65" font-family="'Courier New', monospace" font-size="42" font-weight="900" fill="#fff" filter="url(#glow2)">encchat</text>
+      <text x="125" y="95" font-family="'Courier New', monospace" font-size="15" font-weight="900" letter-spacing="1" fill="#ff3300">PQ · ZERO-KNOWLEDGE</text>
+      <line x1="125" y1="110" x2="310" y2="110" stroke="#660000" stroke-width="2.5"/>
+      <text x="125" y="132" font-family="'Courier New', monospace" font-size="12" font-weight="900" letter-spacing="0.5" fill="#ff6644">PQ-KEM · X25519 · AES-GCM</text>
+
+      <!-- DOWNLOAD BUTTON -->
+      <g transform="translate(345, 30)">
+        <rect width="80" height="120" rx="16" fill="url(#btngrad2)" filter="url(#glow2)"/>
+        <path d="M40,30 L40,70 M25,55 L40,72 L55,55" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="25" y1="85" x2="55" y2="85" stroke="white" stroke-width="3" opacity="0.8"/>
+        <text x="40" y="105" font-family="'Courier New', monospace" font-size="14" font-weight="900" text-anchor="middle" fill="white">.APK</text>
+      </g>
     </svg>
   </a>
 
-  <details id="apk-info" style="max-width:260px;margin:8px auto 0;font-family:'Courier New',monospace;">
-    <summary id="apk-summary" style="border:1px solid #330000;color:#661100;font-family:'Courier New',monospace;font-size:10px;letter-spacing:1.5px;padding:6px 14px;cursor:pointer;width:100%;text-align:center;list-style:none;display:block;" data-ka="▼ რატომ ჯობია APK?" data-en="▼ Why use the APK?">▼ რატომ ჯობია APK?</summary>
-    <div style="border:1px solid #440000;border-top:none;padding:16px;background:#160000;color:#ddaaaa;font-size:12px;line-height:2;letter-spacing:0.3px;">
-      <div id="apk-title" style="color:#ff4422;margin-bottom:10px;font-size:13px;font-weight:bold;" data-ka="რატომ ჯობია APK ბრაუზერს?" data-en="Why is the APK better than a browser?">რატომ ჯობია APK ბრაუზერს?</div>
-      <div style="margin-bottom:6px;" id="apk-r1" data-ka="🔒 <b style='color:#ff6644;'>სქრინშოტი დაბლოკილია</b> — APK-ში ეკრანის გადაღება და ჩაწერა სრულად შეუძლებელია. ბრაუზერში ეს დაცვა არ არის." data-en="🔒 <b style='color:#ff6644;'>Screenshots blocked</b> — Screen capture and recording is fully disabled in the APK. Browsers don't have this protection.">🔒 <b style="color:#ff6644;">სქრინშოტი დაბლოკილია</b> — APK-ში ეკრანის გადაღება და ჩაწერა სრულად შეუძლებელია. ბრაუზერში ეს დაცვა არ არის.</div>
-      <div style="margin-bottom:6px;" id="apk-r2" data-ka="📵 <b style='color:#ff6644;'>ბრაუზერის ზოლი არ ჩანს</b> — სრულეკრანიანი რეჟიმი. სხვა ადამიანი ვერ ხედავს რომ encchat-ს იყენებ." data-en="📵 <b style='color:#ff6644;'>No browser bar</b> — Full screen mode. Others can't see you're using encchat.">📵 <b style="color:#ff6644;">ბრაუზერის ზოლი არ ჩანს</b> — სრულეკრანიანი რეჟიმი. სხვა ადამიანი ვერ ხედავს რომ encchat-ს იყენებ.</div>
-      <div style="margin-bottom:6px;" id="apk-r3" data-ka="🛡️ <b style='color:#ff6644;'>ისტორია არ ინახება</b> — ბრაუზერის cache, history და cookies-ში კვალი არ რჩება." data-en="🛡️ <b style='color:#ff6644;'>No history saved</b> — No trace left in browser cache, history or cookies.">🛡️ <b style="color:#ff6644;">ისტორია არ ინახება</b> — ბრაუზერის cache, history და cookies-ში კვალი არ რჩება.</div>
-      <div style="margin-bottom:6px;" id="apk-r4" data-ka="🔕 <b style='color:#ff6644;'>სხვა ჩანართები ვერ ხედავს</b> — ბრაუზერში სხვა გახსნილ გვერდს შეუძლია ჩაჯდეს და დააფიქსიროს. APK-ში ეს შეუძლებელია." data-en="🔕 <b style='color:#ff6644;'>Other tabs can't see</b> — In a browser, other open pages can potentially spy. Not possible in the APK.">🔕 <b style="color:#ff6644;">სხვა ჩანართები ვერ ხედავს</b> — ბრაუზერში სხვა გახსნილ გვერდს შეუძლია ჩაჯდეს და დააფიქსიროს. APK-ში ეს შეუძლებელია.</div>
-      <div style="margin-top:12px;color:#886666;font-size:11px;" id="apk-footer" data-ka="ორივე შემთხვევაში შეტყობინებები სრულად დაშიფრულია. APK უბრალოდ კიდევ უფრო პრივატულია." data-en="In both cases messages are fully encrypted. The APK is simply even more private.">ორივე შემთხვევაში შეტყობინებები სრულად დაშიფრულია. APK უბრალოდ კიდევ უფრო პრივატულია.</div>
+  <details id="apk-info" style="max-width:320px;margin:15px auto 0;font-family:'Courier New',monospace;">
+    <summary id="apk-summary" style="background:rgba(255,51,0,0.1);border:1px solid #ff3300;color:#ff4422;font-size:15px;font-weight:bold;letter-spacing:1.5px;padding:10px;cursor:pointer;width:100%;text-align:center;list-style:none;display:block;border-radius:8px;transition:0.3s;" data-ka="▼ რატომ ჯობია APK?" data-en="▼ Why use the APK?">▼ რატომ ჯობია APK?</summary>
+    <div style="border:1px solid #550000;border-top:none;padding:20px;background:rgba(10,0,0,0.95);color:#fff;font-size:18px;line-height:1.7;letter-spacing:0.3px;border-radius:0 0 8px 8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+      <div id="apk-title" style="color:#ff3300;margin-bottom:15px;font-size:18px;font-weight:900;text-transform:uppercase;" data-ka="რატომ ჯობია APK?" data-en="Why use the APK?">რატომ ჯობია APK?</div>
+      <div style="margin-bottom:12px;" id="apk-r1" data-ka="🔒 <b style='color:#ff6644;'>სქრინშოტი დაბლოკილია</b> — APK-ში ეკრანის გადაღება შეუძლებელია. ბრაუზერში ეს დაცვა არ არის." data-en="🔒 <b style='color:#ff6644;'>Screenshots blocked</b> — Screen capture is disabled in the APK. Browsers don't have this.">🔒 <b style="color:#ff6644;">სქრინშოტი დაბლოკილია</b> — APK-ში ეკრანის გადაღება შეუძლებელია. ბრაუზერში ეს დაცვა არ არის.</div>
+      <div style="margin-bottom:12px;" id="apk-r2" data-ka="📵 <b style='color:#ff6644;'>Full-Screen</b> — ბრაუზერის ზოლი არ ჩანს. სხვა ადამიანი ვერ ხედავს რას იყენებ." data-en="📵 <b style='color:#ff6644;'>Full-Screen</b> — No browser bar. Others can't see what you use.">📵 <b style="color:#ff6644;">Full-Screen</b> — ბრაუზერის ზოლი არ ჩანს. სხვა ადამიანი ვერ ხედავს რას იყენებ.</div>
+      <div style="margin-bottom:12px;" id="apk-r3" data-ka="🛡️ <b style='color:#ff6644;'>კვალი არ რჩება</b> — ბრაუზერის cache და history-ში ინფორმაცია არ ინახება." data-en="🛡️ <b style='color:#ff6644;'>No trace</b> — No information in browser cache or history.">🛡️ <b style="color:#ff6644;">კვალი არ რჩება</b> — ბრაუზერის cache და history-ში ინფორმაცია არ ინახება.</div>
+      <div style="margin-top:15px;color:#ffaa88;font-size:13px;border-top:1px solid #330000;padding-top:10px;" id="apk-footer" data-ka="ორივე ვერსია სრულად დაშიფრულია. APK უბრალოდ უფრო პრივატულია." data-en="Both versions are fully encrypted. APK is just more private.">ორივე ვერსია სრულად დაშიფრულია. APK უბრალოდ უფრო პრივატულია.</div>
     </div>
   </details>
 
@@ -210,7 +196,7 @@ body.in-chat #lang-switcher {
 
 <!-- PRIVACY NOTICE -->
 <div id="privacy-notice">
-  <button id="privacy-btn" data-ka="[ ℹ️ წაიკითხე სანამ გამოიყენებ ▼ ]" data-en="[ ℹ️ Read Before You Use ▼ ]">[ ℹ️ წაიკითხე სანამ გამოიყენებ ▼ ]</button>
+  <button id="privacy-btn" data-ka="[ ℹ️ კონფიდენციალურობა ▼ ]" data-en="[ ℹ️ Privacy Notice ▼ ]">[ ℹ️ კონფიდენციალურობა ▼ ]</button>
   <div id="privacy-content">
     <p id="priv-p1" style="font-size:14px;line-height:1.8;" data-ka="ჩვენი პლატფორმა გთავაზობთ უსაფრთხოების მრავალშრიან მოდელს, სადაც კონფიდენციალურობა გარანტირებულია მათემატიკური სიზუსტით: პროცესი იწყება თქვენს მოწყობილობაზე Double Ratchet ალგორითმით, რომელიც ყოველი შეტყობინებისთვის ქმნის ახალ, დროებით კრიპტოგრაფიულ გასაღებს, რაც გამორიცხავს წარსული ან მომავალი მიმოწერის გაშიფვრას თუნდაც ერთი გასაღების გაჟონვის შემთხვევაში. ამას ემატება უახლესი პოსტ-კვანტური ML-KEM-1024 სტანდარტი, რომელიც აბსოლუტურ ბარიერს ქმნის მომავლის კვანტური კომპიუტერების წინაშე, ხოლო შეტყობინება დამატებით იფარება AES-256-GCM ავთენტური დაშიფვრით. თქვენი ანონიმურობის დასაცავად, სისტემა იყენებს Reverse Proxy ინფრასტრუქტურას, რაც ნიშნავს, რომ მომხმარებლის რეალური IP მისამართი იფილტრება და იცვლება შუამავალი სერვერით - შედეგად, მთავარ სერვერამდე თქვენი ციფრული კვალი საერთოდ არ აღწევს. ტრაფიკის უსაფრთხოებისთვის ვიყენებთ X25519 გასაღებების გაცვლის პროტოკოლს და SHA-3 ჰეშირების ფუნქციას. სისტემა მუშაობს &quot;ნულოვანი ცოდნის&quot; (Zero-Knowledge) პრინციპით: არ ინახება მეტამონაცემები ან პერსონალური იდენტიფიკატორები, ხოლო შეტყობინება სერვერიდან ფიზიკურად ნადგურდება წაკითხვისთანავე ყოველგვარი კვალის გარეშე. მიუხედავად ამ მრავალშრიანი კრიპტოგრაფიული დაცვისა, პლატფორმის გამოყენებისას საბოლოო არჩევანსა და გადაწყვეტილებას თავად მომხმარებელი იღებს, შესაბამისად, ადმინისტრაცია პასუხს არ აგებს პლატფორმის გამოყენების შედეგად დამდგარ ნებისმიერ შედეგზე ან მომხმარებლის მიერ ინფორმაციის მესამე პირებისთვის გაზიარებაზე." data-en="Our platform offers a multi-layered security model where confidentiality is guaranteed with mathematical precision: the process begins on your device with the Double Ratchet algorithm, which creates a new, temporary cryptographic key for every message, eliminating the possibility of decrypting past or future communications even if a single key is compromised. This is combined with the latest post-quantum ML-KEM-1024 standard, which creates an absolute barrier against future quantum computers, while messages are further protected by AES-256-GCM authenticated encryption. To protect your anonymity, the system uses a Reverse Proxy infrastructure, meaning your real IP address is filtered and replaced by an intermediary server — as a result, your digital footprint never reaches the main server. For traffic security, we use the X25519 key exchange protocol and SHA-3 hashing function. The system operates on a Zero-Knowledge principle: no metadata or personal identifiers are stored, and messages are physically destroyed from the server immediately upon reading without any trace. Despite this multi-layered cryptographic protection, the final choice and decision when using the platform rests with the user themselves, and accordingly, the administration bears no responsibility for any outcome resulting from the use of the platform or the sharing of information with third parties by the user.">ჩვენი პლატფორმა გთავაზობთ უსაფრთხოების მრავალშრიან მოდელს, სადაც კონფიდენციალურობა გარანტირებულია მათემატიკური სიზუსტით: პროცესი იწყება თქვენს მოწყობილობაზე Double Ratchet ალგორითმით, რომელიც ყოველი შეტყობინებისთვის ქმნის ახალ, დროებით კრიპტოგრაფიულ გასაღებს, რაც გამორიცხავს წარსული ან მომავალი მიმოწერის გაშიფვრას თუნდაც ერთი გასაღების გაჟონვის შემთხვევაში. ამას ემატება უახლესი პოსტ-კვანტური ML-KEM-1024 სტანდარტი, რომელიც აბსოლუტურ ბარიერს ქმნის მომავლის კვანტური კომპიუტერების წინაშე, ხოლო შეტყობინება დამატებით იფარება AES-256-GCM ავთენტური დაშიფვრით. თქვენი ანონიმურობის დასაცავად, სისტემა იყენებს Reverse Proxy ინფრასტრუქტურას, რაც ნიშნავს, რომ მომხმარებლის რეალური IP მისამართი იფილტრება და იცვლება შუამავალი სერვერით - შედეგად, მთავარ სერვერამდე თქვენი ციფრული კვალი საერთოდ არ აღწევს. ტრაფიკის უსაფრთხოებისთვის ვიყენებთ X25519 გასაღებების გაცვლის პროტოკოლს და SHA-3 ჰეშირების ფუნქციას. სისტემა მუშაობს &quot;ნულოვანი ცოდნის&quot; (Zero-Knowledge) პრინციპით: არ ინახება მეტამონაცემები ან პერსონალური იდენტიფიკატორები, ხოლო შეტყობინება სერვერიდან ფიზიკურად ნადგურდება წაკითხვისთანავე ყოველგვარი კვალის გარეშე. მიუხედავად ამ მრავალშრიანი კრიპტოგრაფიული დაცვისა, პლატფორმის გამოყენებისას საბოლოო არჩევანსა და გადაწყვეტილებას თავად მომხმარებელი იღებს, შესაბამისად, ადმინისტრაცია პასუხს არ აგებს პლატფორმის გამოყენების შედეგად დამდგარ ნებისმიერ შედეგზე ან მომხმარებლის მიერ ინფორმაციის მესამე პირებისთვის გაზიარებაზე.</p>
   </div>

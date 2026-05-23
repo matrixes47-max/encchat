@@ -155,12 +155,13 @@ document.addEventListener('DOMContentLoaded', function() {
   var privContent = document.getElementById('privacy-content');
   if (privBtn && privContent) {
     privBtn.addEventListener('click', function() {
+      var lang = document.documentElement.lang || 'ka';
       if (privContent.style.display === 'none' || privContent.style.display === '') {
         privContent.style.display = 'block';
-        privBtn.textContent = '[ ℹ️ Privacy Notice ▲ ]';
+        privBtn.textContent = (lang === 'ka') ? '[ ℹ️ კონფიდენციალურობა ▲ ]' : '[ ℹ️ Privacy Notice ▲ ]';
       } else {
         privContent.style.display = 'none';
-        privBtn.textContent = '[ ℹ️ Privacy Notice ▼ ]';
+        privBtn.textContent = (lang === 'ka') ? '[ ℹ️ კონფიდენციალურობა ▼ ]' : '[ ℹ️ Privacy Notice ▼ ]';
       }
     });
   }
