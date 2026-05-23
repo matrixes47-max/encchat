@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Standard deployment (no Tor)
+  encchat:
+    build:
+      context: .
+      target: production
+    container_name: encchat
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TOR_ENABLED=false
+      - TRUST_PROXY=false
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - encchat-network
+    mem_limit: 256m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  # Tor-integrated deployment
+  encchat-tor:
+    build:
+      context: .
+      target: tor-integrated
+    container_name: encchat-tor
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Different port to avoid conflict
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TOR_ENABLED=true
+      - TRUST_PROXY=true
+    volumes:
+      - tor-data:/var/lib/tor/encchat  # Persist .onion address
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - encchat-network
+    mem_limit: 512m
+    cpus: 2.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    # Note: Tor requires some filesystem access, so read_only is not set
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: encchat-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - encchat
+    networks:
+      - encchat-network
+    profiles:
+      - with-nginx
+
+networks:
+  encchat-network:
+    driver: bridge
+
+volumes:
+  tor-data:
+    driver: local
+
+# Usage:
+# Standard deployment:    docker-compose up -d encchat
+# Tor deployment:         docker-compose up -d encchat-tor
+# With Nginx proxy:       docker-compose --profile with-nginx up -d
+# View Tor address:       docker exec encchat-tor cat /var/lib/tor/encchat/hostname

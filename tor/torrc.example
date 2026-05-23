@@ -1,0 +1,29 @@
+# enc.chat Tor Hidden Service Configuration
+# Place this file at: /etc/tor/torrc (or append to existing torrc)
+
+# Hidden Service Configuration for enc.chat
+HiddenServiceDir /var/lib/tor/encchat/
+HiddenServicePort 80 127.0.0.1:3000
+
+# Enhanced Security Settings
+HiddenServiceVersion 3                    # Use v3 onion addresses (longer, more secure)
+HiddenServiceMaxStreams 100               # Limit concurrent connections
+HiddenServiceMaxStreamsCloseCircuit 1     # Close circuit if limit exceeded
+
+# Performance Tuning
+NumEntryGuards 8                          # More entry guards for better anonymity
+CircuitBuildTimeout 60                     # Faster timeout for slow circuits
+
+# Additional Security (Optional but Recommended)
+# SocksPort 0                             # Disable SOCKS if not needed
+# ControlPort 0                            # Disable control port
+# CookieAuthentication 1                   # Enable cookie auth if ControlPort used
+
+# Logging (for debugging)
+Log notice file /var/log/tor/notices.log
+SafeLogging 1                              # Don't log sensitive info
+
+# After configuration:
+# 1. Restart Tor: sudo systemctl restart tor
+# 2. Get your .onion address: sudo cat /var/lib/tor/encchat/hostname
+# 3. Test: http://your-onion-address.onion

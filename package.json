@@ -1,0 +1,22 @@
+{
+  "name": "enc-chat",
+  "version": "1.0.0",
+  "description": "Zero-knowledge encrypted anonymous chat",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "node build-kyber.js",
+    "postinstall": "node build-kyber.js"
+  },
+  "dependencies": {
+    "express": "4.18.2",
+    "crystals-kyber-js": "1.0.0",
+    "hash-wasm": "4.11.0",
+    "@noble/curves": "1.4.0",
+    "esbuild": "0.25.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

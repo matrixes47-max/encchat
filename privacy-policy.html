@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — encchat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; line-height: 1.7; }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+  header { text-align: center; padding: 60px 0 40px; border-bottom: 1px solid #21262d; margin-bottom: 40px; }
+  header h1 { font-size: 2.5em; color: #58a6ff; margin-bottom: 10px; }
+  header p { color: #8b949e; font-size: 0.95em; }
+  .badge { display: inline-block; background: #1f6feb33; border: 1px solid #1f6feb; color: #58a6ff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px; }
+  h2 { color: #58a6ff; font-size: 1.4em; margin: 40px 0 15px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+  h3 { color: #e6edf3; font-size: 1.1em; margin: 25px 0 10px; }
+  p { margin-bottom: 15px; color: #c9d1d9; }
+  .highlight { background: #161b22; border: 1px solid #21262d; border-left: 4px solid #3fb950; border-radius: 6px; padding: 20px 25px; margin: 20px 0; }
+  .highlight.red { border-left-color: #f85149; }
+  .highlight.blue { border-left-color: #58a6ff; }
+  ul { padding-left: 25px; margin-bottom: 15px; }
+  li { margin-bottom: 8px; color: #c9d1d9; }
+  li::marker { color: #3fb950; }
+  .check { color: #3fb950; }
+  .cross { color: #f85149; }
+  footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid #21262d; color: #8b949e; font-size: 0.9em; }
+  footer a { color: #58a6ff; text-decoration: none; }
+  .zero-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+  .zero-item { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 15px; text-align: center; }
+  .zero-item .icon { font-size: 2em; margin-bottom: 8px; }
+  .zero-item p { font-size: 0.85em; color: #8b949e; margin: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🔐 Privacy Policy</h1>
+    <p>encchat v1.0 — Last updated: March 11, 2026</p>
+    <br>
+    <span class="badge">Zero-Knowledge</span>
+    <span class="badge">No Logs</span>
+    <span class="badge">No Account</span>
+    <span class="badge">Open Source</span>
+  </header>
+
+  <div class="highlight">
+    <strong>🛡️ TL;DR:</strong> encchat collects <strong>nothing</strong>. No accounts, no emails, no phone numbers, no message content, no IP addresses. Your messages are end-to-end encrypted and we have zero ability to read them.
+  </div>
+
+  <h2>1. Information We Collect</h2>
+  <div class="zero-box">
+    <div class="zero-item"><div class="icon">📧</div><strong>Email</strong><p>Never collected</p></div>
+    <div class="zero-item"><div class="icon">📱</div><strong>Phone Number</strong><p>Never collected</p></div>
+    <div class="zero-item"><div class="icon">👤</div><strong>Account</strong><p>No registration</p></div>
+    <div class="zero-item"><div class="icon">💬</div><strong>Messages</strong><p>Zero-knowledge encrypted</p></div>
+    <div class="zero-item"><div class="icon">🌐</div><strong>IP Address</strong><p>SHA256 hash only</p></div>
+    <div class="zero-item"><div class="icon">🍪</div><strong>Cookies</strong><p>None used</p></div>
+  </div>
+
+  <h2>2. How Messages Work</h2>
+  <p>All messages are encrypted <strong>on your device</strong> before being sent. The server only sees encrypted ciphertext and has no ability to decrypt it.</p>
+  <ul>
+    <li><span class="check">✅</span> Messages encrypted with AES-256-GCM + ChaCha20</li>
+    <li><span class="check">✅</span> Room names never reach the server (SHA-256 hash only)</li>
+    <li><span class="check">✅</span> Messages auto-deleted after TTL (10 seconds to 24 hours)</li>
+    <li><span class="check">✅</span> No persistent database — in-memory only</li>
+    <li><span class="check">✅</span> Keys zeroed on tab/app close</li>
+  </ul>
+
+  <h2>3. Technical Data</h2>
+  <div class="highlight blue">
+    <h3>Rate Limiting (Anonymous)</h3>
+    <p>To prevent abuse, we store a <strong>SHA-256 hash</strong> of your IP address (not the IP itself) temporarily in memory for rate limiting. This hash cannot be reversed to identify you. It is never written to disk and is cleared automatically.</p>
+  </div>
+
+  <h2>4. Android App</h2>
+  <ul>
+    <li><span class="check">✅</span> <strong>FLAG_SECURE</strong> — Screenshots and screen recording are blocked</li>
+    <li><span class="check">✅</span> No analytics SDK</li>
+    <li><span class="check">✅</span> No crash reporting that sends data</li>
+    <li><span class="check">✅</span> No third-party trackers</li>
+    <li><span class="check">✅</span> Minimum permissions required</li>
+  </ul>
+
+  <h2>5. Third-Party Services</h2>
+  <ul>
+    <li><strong>Render.com</strong> — Hosting provider (may have standard server logs, see their privacy policy)</li>
+    <li><strong>GitHub</strong> — Source code hosting</li>
+  </ul>
+  <p>We do not use Google Analytics, Facebook Pixel, or any advertising networks.</p>
+
+  <h2>6. Data Retention</h2>
+  <ul>
+    <li>Messages: Deleted after TTL expires (max 24 hours)</li>
+    <li>IP hashes: Cleared automatically from memory</li>
+    <li>Everything else: Not collected, therefore not retained</li>
+  </ul>
+
+  <h2>7. Children's Privacy</h2>
+  <p>encchat does not knowingly collect information from children under 13. If you are under 13, please do not use this service.</p>
+
+  <h2>8. Changes to This Policy</h2>
+  <p>If we update this policy, we will update the date at the top of this page and note changes in our GitHub releases.</p>
+
+  <h2>9. Contact</h2>
+  <p>Questions about this privacy policy? Open an issue on <a href="https://github.com/matrixes47-max/encchat">GitHub</a>.</p>
+
+  <footer>
+    <p><strong>encchat v1.0</strong> — Zero-Knowledge · Open Source · MIT License</p>
+    <p style="margin-top:10px"><a href="https://github.com/matrixes47-max/encchat">GitHub</a> · <a href="https://geo.encchat.workers.dev">Demo</a></p>
+    <p style="margin-top:15px; font-size:0.8em">© 2026 matrixes47-max · MIT License</p>
+  </footer>
+</div>
+</body>
+</html>
